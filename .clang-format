@@ -1,0 +1,6 @@
+BasedOnStyle: LLVM
+AlignConsecutiveDeclarations: true
+IndentWidth: 2
+ColumnLimit: 80
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true

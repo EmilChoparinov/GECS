@@ -31,7 +31,7 @@ BUILD_DIR = .
 # LDFLAGS:
 # 	- Additions.
 #-------------------------------------------------------------------------------
-CC = clang
+CC = gcc
 EXT = .c
 CXXFLAGS = -g -Wall -Werror -UDEBUG $(INC_DIR)
 BUILDFLAGS =
@@ -43,6 +43,7 @@ LDFLAGS =
 # 	- The name of the executable file
 #-------------------------------------------------------------------------------
 BUILD_FILE = ecs
+BUILD_TEST = ecs_test
 OUTPUTS = $(BUILD_DIR)/$(BUILD_FILE)
 
 #-------------------------------------------------------------------------------

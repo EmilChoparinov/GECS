@@ -3,7 +3,7 @@
 #include "map.h"
 #include "vector.h"
 
-const unsigned long hash(const char *str);
+static const unsigned long hash(const char *str);
 
 struct map_t {
   void **slots;
@@ -85,7 +85,7 @@ bool map_has(map_t *map, void *key, size_t key_size) {
   return result != NULL;
 }
 
-const unsigned long hash(const char *str) {
+static const unsigned long hash(const char *str) {
   /* djb2 by Dan Bernstein
    * http://www.cse.yorku.ca/~oz/hash.html */
   unsigned long hash = 5381;

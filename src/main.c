@@ -3,6 +3,7 @@
 #include "arena.h"
 #include "gecs.h"
 #include "map.h"
+#include "nmap.h"
 #include "vector.h"
 
 void test_vector(void) {
@@ -62,10 +63,7 @@ void test_map(void) {
   map_t *hmap = map_make(sizeof(mat_2d_t));
 
   kv_pair_t test = {
-    .key = "testing",
-    .key_size = sizeof("testing"),
-    .value = NULL
-  };
+      .key = "testing", .key_size = sizeof("testing"), .value = NULL};
 
   map_add(hmap, &(kv_pair_t){.key = "hello",
                              .key_size = sizeof("hello"),
@@ -78,16 +76,50 @@ void test_map(void) {
   mat_2d_t *first = map_find(hmap, "hello", sizeof("hello"));
   mat_2d_t *second = map_find(hmap, "world", sizeof("world"));
 
-  if(first == NULL) printf("first is null\n");
-  if(second == NULL) printf("second is null\n");
+  if (first == NULL) printf("first is null\n");
+  if (second == NULL) printf("second is null\n");
 
   printf("%d,%d\n%d,%d\n", first->x, first->y, second->x, second->y);
+}
+
+void test_nmap(void) {
+  int     zero = 0;
+  int     one = 1;
+  int     two = 2;
+  int     three = 3;
+  nmap_t *map = nmap_make(sizeof(int), sizeof(mat_2d_t), 2);
+  nmap_add(map, &(nmap_keypair_t){.key = (void *)&zero,
+                                  .value = &(mat_2d_t){.x = 6, .y = 9}});
+  nmap_add(map, &(nmap_keypair_t){.key = (void *)&one,
+                                  .value = &(mat_2d_t){.x = 7, .y = 8}});
+  nmap_add(map, &(nmap_keypair_t){.key = (void *)&two,
+                                  .value = &(mat_2d_t){.x = 8, .y = 7}});
+  nmap_add(map, &(nmap_keypair_t){.key = (void *)&three,
+                                  .value = &(mat_2d_t){.x = 9, .y = 6}});
+
+  mat_2d_t *first = nmap_find(map, &zero);
+  mat_2d_t *third = nmap_find(map, &two);
+  mat_2d_t *last = nmap_find(map, &three);
+
+  if (first == NULL) printf("first is null\n");
+  if (third == NULL) printf("third is null\n");
+  if (last == NULL) printf("last is null\n");
+
+  printf("%d,%d\n%d,%d\n%d,%d", first->x, first->y, third->x, third->y, last->x,
+         last->y);
+
+  nmap_remove(map, &two);
+  nmap_remove(map, &one);
+  nmap_remove(map, &three);
+  nmap_remove(map, &zero);
+  nmap_free(map);
 }
 
 int main() {
   // test_vector();
   // test_arena();
-  test_map();
+  // test_map();
+  test_nmap();
 
   // test_world();
   return 0;

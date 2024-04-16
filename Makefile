@@ -16,7 +16,10 @@
 INC_DIR = -I./include/ -I./src/structures/ -I./src/core/
 SRC_DIR = src
 OBJ_DIR = obj
-BUILD_DIR = .
+TST_DIR = tests
+BUILD_DIR =
+
+TST_BINS_DIR = tests/bin
 
 #-------------------------------------------------------------------------------
 # Compiler Configuations
@@ -31,9 +34,10 @@ BUILD_DIR = .
 # LDFLAGS:
 # 	- Additions.
 #-------------------------------------------------------------------------------
-CC = gcc
+CC = clang
 EXT = .c
 CXXFLAGS = -g -Wall -Werror -UDEBUG $(INC_DIR)
+TESTFLAGS = -lcriterion
 BUILDFLAGS =
 LDFLAGS =
 
@@ -42,9 +46,9 @@ LDFLAGS =
 # BUILD_FILE:
 # 	- The name of the executable file
 #-------------------------------------------------------------------------------
-BUILD_FILE = ecs
-BUILD_TEST = ecs_test
-OUTPUTS = $(BUILD_DIR)/$(BUILD_FILE)
+BUILD_FILE = libgecs
+BUILD_LIB_FILE   = $(BUILD_DIR)$(BUILD_FILE).a
+OUTPUTS    = $(BUILD_DIR)/$(BUILD_LIB_FILE)
 
 #-------------------------------------------------------------------------------
 # Project Sources
@@ -53,6 +57,9 @@ OUTPUTS = $(BUILD_DIR)/$(BUILD_FILE)
 #-------------------------------------------------------------------------------
 SRC_FILES = $(shell find $(SRC_DIR) -name "*$(EXT)")
 OBJ_FILES = $(SRC_FILES:$(SRC_DIR)/%$(EXT)=$(OBJ_DIR)/%.o)
+TST_FILES = $(wildcard $(TST_DIR)/*.c)
+
+TST_BINS=$(patsubst $(TST_DIR)/%.c, $(TST_BINS_DIR)/%, $(TST_FILES))
 
 #-------------------------------------------------------------------------------
 # Makefile Rules
@@ -66,13 +73,14 @@ all: notif $(BUILD_FILE)
 .PHONY: clean
 
 clean:
-	@echo "Cleaning /obj/*, $(OUTPUTS) .."
+	@echo "Cleaning /obj/*, /tests/bin/* $(OUTPUTS), .."
 	@rm -r -f $(OUTPUTS)
-	@rm -r -f obj
+	@rm -r -f $(OBJ_DIR)
+	@rm -r -f $(TST_BINS_DIR)
 
 $(BUILD_FILE): $(OBJ_FILES)
-	@echo Linking...
-	@$(CC) $(CXXFLAGS) -o ./${BUILD_DIR}/$@ $^ $(LDFLAGS)
+	@echo Bundling...
+	ar cr $(BUILD_LIB_FILE) $^
 	@echo Done! GLHF
 
 notif:
@@ -83,3 +91,18 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%$(EXT)
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
 	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
+
+test: $(BUILD_FILE) $(TST_DIR) $(TST_BINS_DIR) $(TST_BINS)
+	@echo Running Tests...
+	@for test in $(TST_BINS) ; do ./$$test --verbose ; done
+
+$(TST_BINS_DIR)/%: $(TST_DIR)/%.c
+	@echo + $< -\> $@
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(TESTFLAGS) $< $(BUILD_LIB_FILE) -o $@
+
+$(TST_DIR):
+	@echo in TST_DIR
+	@mkdir $@
+
+$(TST_BINS_DIR):
+	@mkdir $@

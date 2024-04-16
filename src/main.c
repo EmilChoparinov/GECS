@@ -87,7 +87,7 @@ void test_nmap(void) {
   int     one = 1;
   int     two = 2;
   int     three = 3;
-  nmap_t *map = nmap_make(sizeof(int), sizeof(mat_2d_t), 2);
+  nmap_t *map = nmap_make(sizeof(int), sizeof(mat_2d_t), 64);
   nmap_add(map, &(nmap_keypair_t){.key = (void *)&zero,
                                   .value = &(mat_2d_t){.x = 6, .y = 9}});
   nmap_add(map, &(nmap_keypair_t){.key = (void *)&one,
@@ -113,14 +113,4 @@ void test_nmap(void) {
   nmap_remove(map, &three);
   nmap_remove(map, &zero);
   nmap_free(map);
-}
-
-int main() {
-  // test_vector();
-  // test_arena();
-  // test_map();
-  test_nmap();
-
-  // test_world();
-  return 0;
 }

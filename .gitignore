@@ -1,3 +1,6 @@
+### Project Specific ###
+tests/bin/**
+
 ### C ###
 # Prerequisites
 *.d

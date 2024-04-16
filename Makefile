@@ -36,7 +36,7 @@ TST_BINS_DIR = tests/bin
 #-------------------------------------------------------------------------------
 CC = clang
 EXT = .c
-CXXFLAGS = -g -Wall -Werror -UDEBUG $(INC_DIR)
+CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG $(INC_DIR)
 TESTFLAGS = -lcriterion
 BUILDFLAGS =
 LDFLAGS =

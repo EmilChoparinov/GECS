@@ -3,7 +3,8 @@
 #include "unity.h"
 
 //== REGISTER ==================================================================
-BOILER();
+void setUp(void) {}
+void tearDown(void) {}
 
 /* Test creation and deletion logic */
 void create_and_delete(void);

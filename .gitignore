@@ -26,6 +26,9 @@ tests/bin/**
 *.la
 *.lo
 
+# Project Specific Libraries
+!libunity.a
+
 # Shared objects (inc. Windows DLLs)
 *.dll
 *.so

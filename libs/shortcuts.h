@@ -5,6 +5,4 @@
   void setUp(void) {}                                                          \
   void tearDown(void) {}
 
-#define REGISTER(func) void func(void);
-
 #endif

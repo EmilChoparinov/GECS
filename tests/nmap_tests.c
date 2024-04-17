@@ -6,19 +6,19 @@
 BOILER();
 
 /* Test creation and deletion logic */
-REGISTER(create_and_delete);
+void create_and_delete(void);
 /* Test adding to a static map */
-REGISTER(add_no_resize);
+void add_no_resize(void);
 /* Test removing on a static map */
-REGISTER(remove_no_resize);
+void remove_no_resize(void);
 /* Test adding on a dynamic map */
-REGISTER(add_resize);
+void add_resize(void);
 /* Test removing on a dynamic map */
-REGISTER(remove_resize);
+void remove_resize(void);
 /* Test on returning undefined and defined keys */
-REGISTER(key_querying);
+void key_querying(void);
 /* Testing to make sure variables are copied to the structures memory */
-REGISTER(variables_copied_correctly);
+void variables_copied_correctly(void);
 
 int main(void) {
   UNITY_BEGIN();

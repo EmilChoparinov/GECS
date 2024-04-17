@@ -13,11 +13,11 @@
 # SRC_DIR:
 #	- Source directory.
 #-------------------------------------------------------------------------------
-INC_DIR = -I./include/ -I./src/structures/ -I./src/core/
+INC_DIR = -I./libs/ -I./include/ -I./src/structures/ -I./src/core/
 SRC_DIR = src
 OBJ_DIR = obj
 TST_DIR = tests
-BUILD_DIR =
+BUILD_DIR = .
 
 TST_BINS_DIR = tests/bin
 
@@ -37,7 +37,7 @@ TST_BINS_DIR = tests/bin
 CC = clang
 EXT = .c
 CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG $(INC_DIR)
-TESTFLAGS = -lcriterion
+TESTFLAGS = -L./libs -lunity
 BUILDFLAGS =
 LDFLAGS =
 
@@ -47,8 +47,7 @@ LDFLAGS =
 # 	- The name of the executable file
 #-------------------------------------------------------------------------------
 BUILD_FILE = libgecs
-BUILD_LIB_FILE   = $(BUILD_DIR)$(BUILD_FILE).a
-OUTPUTS    = $(BUILD_DIR)/$(BUILD_LIB_FILE)
+BUILD_LIB_FILE   = $(BUILD_DIR)/$(BUILD_FILE).a
 
 #-------------------------------------------------------------------------------
 # Project Sources
@@ -73,8 +72,8 @@ all: notif $(BUILD_FILE)
 .PHONY: clean
 
 clean:
-	@echo "Cleaning /obj/*, /tests/bin/* $(OUTPUTS), .."
-	@rm -r -f $(OUTPUTS)
+	@echo "Cleaning /obj/*, /tests/bin/*, $(BUILD_LIB_FILE), .."
+	@rm -r -f $(BUILD_LIB_FILE)
 	@rm -r -f $(OBJ_DIR)
 	@rm -r -f $(TST_BINS_DIR)
 
@@ -84,7 +83,7 @@ $(BUILD_FILE): $(OBJ_FILES)
 	@echo Done! GLHF
 
 notif:
-	@echo Building ECS to ${BUILD_DIR}/${BUILD_FILE}...
+	@echo Building ECS to ${BUILD_LIB_FILE}...
 	@mkdir -p ${BUILD_DIR}
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%$(EXT)
@@ -98,7 +97,7 @@ test: $(BUILD_FILE) $(TST_DIR) $(TST_BINS_DIR) $(TST_BINS)
 
 $(TST_BINS_DIR)/%: $(TST_DIR)/%.c
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(TESTFLAGS) $< $(BUILD_LIB_FILE) -o $@
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $< $(TESTFLAGS) $(BUILD_LIB_FILE) -o $@
 
 $(TST_DIR):
 	@echo in TST_DIR

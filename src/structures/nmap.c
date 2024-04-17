@@ -127,6 +127,7 @@ static int ensure_lf_constraint(nmap_t *map) {
   free(map->in_use);
   free(map->slots);
 
+  map->capacity *= 2;
   map->in_use = temp_map->in_use;
   map->slots = temp_map->slots;
 

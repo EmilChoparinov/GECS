@@ -1,61 +1,149 @@
-#include <criterion/criterion.h>
-Test(Hello,World)
-{
+#include "nmap.h"
+#include "shortcuts.h"
+#include "unity.h"
+
+//== REGISTER ==================================================================
+BOILER();
+
+/* Test creation and deletion logic */
+REGISTER(create_and_delete);
+/* Test adding to a static map */
+REGISTER(add_no_resize);
+/* Test removing on a static map */
+REGISTER(remove_no_resize);
+/* Test adding on a dynamic map */
+REGISTER(add_resize);
+/* Test removing on a dynamic map */
+REGISTER(remove_resize);
+/* Test on returning undefined and defined keys */
+REGISTER(key_querying);
+/* Testing to make sure variables are copied to the structures memory */
+REGISTER(variables_copied_correctly);
+
+int main(void) {
+  UNITY_BEGIN();
+
+  RUN_TEST(create_and_delete);
+  RUN_TEST(add_no_resize);
+  RUN_TEST(remove_no_resize);
+  RUN_TEST(add_resize);
+  RUN_TEST(remove_resize);
+  RUN_TEST(key_querying);
+  RUN_TEST(variables_copied_correctly);
+
+  return UNITY_END();
 }
 
-// #include <criterion/criterion.h>
+//== TESTS =====================================================================
+void create_and_delete(void) {
+  nmap_t *map = nmap_make(sizeof(int), sizeof(int), 1);
 
-// Test(misc, failing) {
-//     cr_assert(0);
-// }
+  TEST_ASSERT(map != NULL);
 
-// Test(misc, passing) {
-//     cr_assert(1);
-// }
+  TEST_ASSERT(nmap_free(map) == NMAP_OK);
+}
 
-// Test(nmap_tests, create) {
-//   nmap_t *map = nmap_make(sizeof(int), sizeof(int), 1);
-//   cr_assert(map != NULL, "Expect map to not be null");
+void add_no_resize(void) {
+  nmap_t *map = nmap_make(sizeof(int), sizeof(int), 64);
 
-//   nmap_free(map);
-// }
+  for (int i = 0; i < 64 * NMAP_LOAD_FACTOR; i++) {
+    int stored_value = i + 1;
+    nmap_add(map, &(nmap_keypair_t){.key = &i, .value = &stored_value});
+  }
 
-// Test(nmap_tests, add_no_resize) {
-//   nmap_t *map = nmap_make(sizeof(int), sizeof(int), 64);
+  for (int i = 0; i < 64 * NMAP_LOAD_FACTOR; i++) {
+    int *value = nmap_find(map, &i);
+    TEST_ASSERT(value != NULL);
+    TEST_ASSERT(*value == i + 1);
+  }
 
-//   for (int i = 0; i < 64 * NMAP_LOAD_FACTOR; i++) {
-//     int stored_value = i + 1;
-//     nmap_add(map, &(nmap_keypair_t){.key = &i, .value = &stored_value});
-//   }
+  nmap_free(map);
+}
 
-//   for (int i = 0; i < 64 * NMAP_LOAD_FACTOR; i++) {
-//     int *value = nmap_find(map, &i);
-//     cr_assert(value != NULL,
-//               "Find returned a null value when it expected a find success");
-//     cr_assert(
-//         *value == i + 1,
-//         "nmap find did not return the expected value. Result %d, Expected %d",
-//         *value, i + 1);
-//   }
+void remove_no_resize(void) {
+  nmap_t *map = nmap_make(sizeof(int), sizeof(int), 64);
 
-//   nmap_free(map);
-// }
+  for (int i = 0; i < 64 * NMAP_LOAD_FACTOR; i++) {
+    int stored_value = i + 1;
+    nmap_add(map, &(nmap_keypair_t){.key = &i, .value = &stored_value});
+  }
 
-// Test(nmap_tests, remove_no_resize) {
-//   nmap_t *map = nmap_make(sizeof(int), sizeof(int), 64);
+  for (int i = 0; i < 64 * NMAP_LOAD_FACTOR; i++) {
+    int success = nmap_remove(map, &i);
+    TEST_ASSERT(success == NMAP_OK);
+    int *value = nmap_find(map, &i);
+    TEST_ASSERT(value == NULL);
+  }
 
-//   for (int i = 0; i < 64 * NMAP_LOAD_FACTOR; i++) {
-//     int stored_value = i + 1;
-//     nmap_add(map, &(nmap_keypair_t){.key = &i, .value = &stored_value});
-//   }
+  nmap_free(map);
+}
 
-//   for (int i = 0; i < 64 * NMAP_LOAD_FACTOR; i++) {
-//     int success = nmap_remove(map, &i);
-//     cr_assert(success == NMAP_OK, "nmap failed at key removal");
-//     int *value = nmap_find(map, &i);
-//     cr_assert(value == NULL, "Key was not actually removed. Value of key: %d",
-//               *value);
-//   }
+void add_resize(void) {
+  nmap_t *map = nmap_make(sizeof(int), sizeof(int), 2);
 
-//   nmap_free(map);
-// }
+  for (int i = 0; i < 64; i++) {
+    int stored_value = i + 1;
+    nmap_add(map, &(nmap_keypair_t){.key = &i, .value = &stored_value});
+  }
+
+  for (int i = 0; i < 64; i++) {
+    int *value = nmap_find(map, &i);
+    TEST_ASSERT(value != NULL);
+    TEST_ASSERT(*value == i + 1);
+  }
+
+  nmap_free(map);
+}
+
+void remove_resize(void) {
+  nmap_t *map = nmap_make(sizeof(int), sizeof(int), 1);
+
+  for (int i = 0; i < 64; i++) {
+    int stored_value = i + 1;
+    nmap_add(map, &(nmap_keypair_t){.key = &i, .value = &stored_value});
+  }
+
+  for (int i = 0; i < 64; i++) {
+    int success = nmap_remove(map, &i);
+    TEST_ASSERT(success == NMAP_OK);
+    int *value = nmap_find(map, &i);
+    TEST_ASSERT(value == NULL);
+  }
+
+  nmap_free(map);
+}
+
+void key_querying(void) {
+  nmap_t *map = nmap_make(sizeof(int), sizeof(int), 1);
+
+  int key = 5;
+  int value = 6;
+
+  int *ret = nmap_find(map, &key);
+  TEST_ASSERT(ret == NULL);
+  nmap_add(map, &(nmap_keypair_t){.key = &key, .value = &value});
+  ret = nmap_find(map, &key);
+  TEST_ASSERT(ret != NULL);
+  TEST_ASSERT(*ret == value);
+
+  nmap_free(map);
+}
+
+void variables_copied_correctly(void) {
+  nmap_t *map = nmap_make(sizeof(int), sizeof(int), 1);
+
+  int key = 5;
+  int value = 6;
+
+  int *ret = nmap_find(map, &key);
+
+  TEST_ASSERT(ret == NULL);
+
+  nmap_add(map, &(nmap_keypair_t){.key = &key, .value = &value});
+  value++;
+  ret = nmap_find(map, &key);
+
+  TEST_ASSERT(ret != NULL);
+  TEST_ASSERT(*ret != value);
+  nmap_free(map);
+}

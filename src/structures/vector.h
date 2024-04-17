@@ -3,7 +3,7 @@
 
 #define VECTOR_FAIL -1
 #define VECTOR_OKAY 0
-#define VECTOR_CHUNK_CAP 64
+#define VECTOR_CHUNK_CAP 2048
 
 #include <stdlib.h>
 

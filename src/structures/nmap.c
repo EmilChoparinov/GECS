@@ -115,6 +115,7 @@ static int ensure_lf_constraint(nmap_t *map) {
 
   temp_map = nmap_make(map->key_size, map->value_size, map->capacity * 2);
 
+  // we move keys over to the new temp_map
   for (old_index = 0; old_index < map->capacity; old_index++) {
     if (!map->in_use[old_index]) continue;
     if (nmap_add(temp_map, &(nmap_keypair_t){
@@ -124,6 +125,7 @@ static int ensure_lf_constraint(nmap_t *map) {
       return NMAP_FAIL;
   }
 
+  // Pointer manipulation to merge old map and new map
   free(map->in_use);
   free(map->slots);
 

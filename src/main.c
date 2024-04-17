@@ -2,7 +2,6 @@
 
 #include "arena.h"
 #include "gecs.h"
-#include "map.h"
 #include "nmap.h"
 #include "vector.h"
 
@@ -59,28 +58,28 @@ void test_world(void) {
   gecs_complete(world);
 }
 
-void test_map(void) {
-  map_t *hmap = map_make(sizeof(mat_2d_t));
+// void test_map(void) {
+//   map_t *hmap = map_make(sizeof(mat_2d_t));
 
-  kv_pair_t test = {
-      .key = "testing", .key_size = sizeof("testing"), .value = NULL};
+//   kv_pair_t test = {
+//       .key = "testing", .key_size = sizeof("testing"), .value = NULL};
 
-  map_add(hmap, &(kv_pair_t){.key = "hello",
-                             .key_size = sizeof("hello"),
-                             .value = &(mat_2d_t){.x = 5, .y = 5}});
-  map_add(hmap, &(kv_pair_t){.key = "world",
-                             .key_size = sizeof("world"),
-                             .value = &(mat_2d_t){.x = 420, .y = 69}});
-  map_add(hmap, &test);
+//   map_add(hmap, &(kv_pair_t){.key = "hello",
+//                              .key_size = sizeof("hello"),
+//                              .value = &(mat_2d_t){.x = 5, .y = 5}});
+//   map_add(hmap, &(kv_pair_t){.key = "world",
+//                              .key_size = sizeof("world"),
+//                              .value = &(mat_2d_t){.x = 420, .y = 69}});
+//   map_add(hmap, &test);
 
-  mat_2d_t *first = map_find(hmap, "hello", sizeof("hello"));
-  mat_2d_t *second = map_find(hmap, "world", sizeof("world"));
+//   mat_2d_t *first = map_find(hmap, "hello", sizeof("hello"));
+//   mat_2d_t *second = map_find(hmap, "world", sizeof("world"));
 
-  if (first == NULL) printf("first is null\n");
-  if (second == NULL) printf("second is null\n");
+//   if (first == NULL) printf("first is null\n");
+//   if (second == NULL) printf("second is null\n");
 
-  printf("%d,%d\n%d,%d\n", first->x, first->y, second->x, second->y);
-}
+//   printf("%d,%d\n%d,%d\n", first->x, first->y, second->x, second->y);
+// }
 
 void test_nmap(void) {
   int     zero = 0;

@@ -97,7 +97,7 @@ test: $(BUILD_FILE) $(TST_DIR) $(TST_BINS_DIR) $(TST_BINS)
 
 $(TST_BINS_DIR)/%: $(TST_DIR)/%.c
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $< $(TESTFLAGS) $(BUILD_LIB_FILE) -o $@
+	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) $< $(TESTFLAGS) $(BUILD_LIB_FILE) -o $@
 
 $(TST_DIR):
 	@echo in TST_DIR

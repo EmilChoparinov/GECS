@@ -2,27 +2,33 @@
 #define __HEADER_GECS_H__
 
 #include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
 
-#include "vector.h"
+#include "gecs_utils.h"
 
-/* Import all headers from other core parts of the library */
-#include "gecs_def.h"
-#include "gecs_id.h"
+#include "short_vector.h"
 
-typedef struct gecs_core_t           gecs_core_t;
+#define GECS_OK 0
+#define GECS_FAIL -1
+
+typedef int32_t gecs_size_t; // To avoid unsignedness
+
+typedef struct gecs_core_t   gecs_core_t;
+typedef struct gecs_entity_t gecs_entity_t;
+
 typedef struct gecs_component_info_t gecs_component_info_t;
+struct gecs_component_info_t {
+  char *name;
+  void *component_data;
 
-struct gecs_core_t {
-  uint64_t  tick;
-  gecs_id_t id_generator;
-
-  vector_t *components_registry;
+  size_t name_len;
+  size_t component_size;
 };
 
-struct gecs_component_info_t {
-  const gecs_size_t size;
-  const char       *name;
-  gecs_id_t         id;
+typedef struct gecs_system_info_t gecs_system_info_t;
+struct gecs_system_info_t {
+  void (*sys)(gecs_entity_t *entt);
 };
 
 /**
@@ -46,26 +52,14 @@ void gecs_progress(gecs_core_t *world);
  */
 void gecs_complete(gecs_core_t *world);
 
-/**
- * @brief Adds the component info to the world object. No instances are done
- * this is just simply a registration step with the framework.
- *
- * @param world The ECS instance
- * @param info The component info to generate with later
- */
-void gecs_register_component(gecs_core_t *world, gecs_component_info_t *info);
+int gecs_register_component(gecs_core_t                  *world,
+                            struct gecs_component_info_t *info);
 
-#define GECS_WORLD_GEN_ID(world, T)                                            \
-  gecs_id_t gecs_id(T) = ++world->id_generator;
+gecs_entity_t *gecs_make_entity(gecs_core_t *world);
 
-#define GECS_REG_COMPONENT(world, component)                                   \
-  GECS_WORLD_GEN_ID(world, component);                                         \
-  {                                                                            \
-    gecs_component_info_t cinfo = {.size = sizeof(#component),                 \
-                                   .name = #component,                         \
-                                   .id = gecs_id(component)};                  \
-    gecs_register_component(world, &cinfo);                                    \
-  }                                                                            \
-  assert(gecs_id(component) != 0);                                             \
+int gecs_add_component(gecs_core_t *world, gecs_entity_t *entt,
+                       const char *component_name, const size_t len);
+
+
 
 #endif

@@ -42,21 +42,21 @@ typedef struct {
   int y;
 } mat_2d_t;
 
-void test_world(void) {
-  gecs_core_t *world = gecs_make_world();
+// void test_world(void) {
+//   gecs_core_t *world = gecs_make_world();
 
-  GECS_REG_COMPONENT(world, mat_2d_t);
+//   GECS_REG_COMPONENT(world, mat_2d_t);
 
-  gecs_component_info_t *x =
-      (gecs_component_info_t *)vector_at(world->components_registry, 0);
+//   gecs_component_info_t *x =
+//       (gecs_component_info_t *)vector_at(world->components_registry, 0);
 
-  printf("%lu\n", x->id);
-  printf("sizeof: %zu\n", sizeof(mat_2d_t));
+//   printf("%lu\n", x->id);
+//   printf("sizeof: %zu\n", sizeof(mat_2d_t));
 
-  for (int i = 0; i < 2; i++) gecs_progress(world);
+//   for (int i = 0; i < 2; i++) gecs_progress(world);
 
-  gecs_complete(world);
-}
+//   gecs_complete(world);
+// }
 
 // void test_map(void) {
 //   map_t *hmap = map_make(sizeof(mat_2d_t));

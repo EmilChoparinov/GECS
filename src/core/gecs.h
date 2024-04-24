@@ -29,6 +29,7 @@ struct gecs_component_info_t {
 typedef struct gecs_system_info_t gecs_system_info_t;
 struct gecs_system_info_t {
   void (*sys)(gecs_entity_t *entt);
+  char *component_names[]; // use NULL sentinel at the end
 };
 
 /**
@@ -52,14 +53,12 @@ void gecs_progress(gecs_core_t *world);
  */
 void gecs_complete(gecs_core_t *world);
 
-int gecs_register_component(gecs_core_t                  *world,
-                            struct gecs_component_info_t *info);
+int gecs_register_component(gecs_core_t *world, gecs_component_info_t *info);
+int gecs_register_system(gecs_core_t *world, gecs_system_info_t *info);
 
 gecs_entity_t *gecs_make_entity(gecs_core_t *world);
 
 int gecs_add_component(gecs_core_t *world, gecs_entity_t *entt,
                        const char *component_name, const size_t len);
-
-
 
 #endif

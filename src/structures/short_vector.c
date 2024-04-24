@@ -33,6 +33,26 @@ void *short_vec_at(short_vec_t *v, int i) {
   return v->elements + i * v->el_size;
 }
 
+void *short_vec_find(short_vec_t *v, compare_cust predicate) {
+  int   i;
+  void *at_el;
+  for (i = 0; i < v->len; i++) {
+    at_el = short_vec_at(v, i);
+    if (predicate(at_el)) return at_el;
+  }
+  return NULL;
+}
+
+bool short_vec_has(short_vec_t *v, void *el) {
+  int   i;
+  void *at_el;
+  for (i = 0; i < v->len; i++) {
+    at_el = short_vec_at(v, i);
+    if (memcmp(at_el, el, v->el_size) == 0) return true;
+  }
+  return false;
+}
+
 int short_vec_push(short_vec_t *v, void *el) {
   if (v->len == v->capacity)
     if (short_vec_resize(v, v->capacity * 2) == SHORT_VEC_FAIL)

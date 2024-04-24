@@ -1,6 +1,6 @@
 #include "gecs_utils.h"
 
-static const unsigned long hash(const char *str) {
+const unsigned long hash(const char *str) {
   /* djb2 by Dan Bernstein
    * http://www.cse.yorku.ca/~oz/hash.html */
   unsigned long hash = 5381;

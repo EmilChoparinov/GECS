@@ -21,6 +21,14 @@ void initial_state_check(void);
 
 void first_last_check(void);
 
+void has_check(void);
+
+void has_no_check(void);
+
+void find_check(void);
+
+void no_find_check(void);
+
 int main(void) {
   UNITY_BEGIN();
 
@@ -30,6 +38,10 @@ int main(void) {
   RUN_TEST(fill_256);
   RUN_TEST(initial_state_check);
   RUN_TEST(first_last_check);
+  RUN_TEST(has_check);
+  RUN_TEST(has_no_check);
+  RUN_TEST(find_check);
+  RUN_TEST(no_find_check);
 
   return UNITY_END();
 }
@@ -82,4 +94,62 @@ void first_last_check(void) {
   short_vec_push(test_vector, &x);
   TEST_ASSERT(*(int *)short_vec_first(test_vector) ==
               *(int *)short_vec_top(test_vector));
+}
+
+void has_check(void) {
+  int a, b, c;
+
+  a = 5;
+  b = 6;
+  c = 7;
+
+  short_vec_push(test_vector, &a);
+  short_vec_push(test_vector, &b);
+  short_vec_push(test_vector, &c);
+
+  TEST_ASSERT(short_vec_has(test_vector, &a));
+  TEST_ASSERT(short_vec_has(test_vector, &b));
+  TEST_ASSERT(short_vec_has(test_vector, &c));
+}
+
+void has_no_check(void) {
+  int a, b, c;
+
+  a = 5;
+  b = 6;
+  c = 7;
+
+  short_vec_push(test_vector, &a);
+
+  TEST_ASSERT(short_vec_has(test_vector, &a));
+  TEST_ASSERT(!short_vec_has(test_vector, &b));
+  TEST_ASSERT(!short_vec_has(test_vector, &c));
+}
+
+bool look_for_6(const void *el) { return *(int *)el == 6; }
+bool look_for_5(const void *el) { return *(int *)el == 5; }
+
+void find_check(void) {
+  int a, b, c;
+
+  a = 5;
+  b = 6;
+  c = 7;
+
+  short_vec_push(test_vector, &a);
+  short_vec_push(test_vector, &b);
+  short_vec_push(test_vector, &c);
+
+  TEST_ASSERT(short_vec_find(test_vector, look_for_6) != NULL);
+}
+
+void no_find_check(void) {
+  int a;
+
+  a = 5;
+
+  short_vec_push(test_vector, &a);
+
+  TEST_ASSERT(short_vec_find(test_vector, look_for_6) == NULL);
+  TEST_ASSERT(short_vec_find(test_vector, look_for_5) != NULL);
 }

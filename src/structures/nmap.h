@@ -1,3 +1,12 @@
+/* =========================================================================
+  Author: E.D Choparinov, Amsterdam
+  Related Files: nmap.h nmap.c
+  Created On: April 16 2024
+  Purpose:
+    Stand-alone open-address map provider. Include nmap.h to access the
+    data structure.
+========================================================================= */
+
 #ifndef __HEADER_NMAP_H__
 #define __HEADER_NMAP_H__
 

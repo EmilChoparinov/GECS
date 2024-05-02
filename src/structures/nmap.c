@@ -1,7 +1,8 @@
 #include "nmap.h"
+#include <stdio.h>
 
 struct nmap_t {
-  char           *in_use;
+  char           *slot_used;
   nmap_keypair_t *slots;
 
   size_t slots_used;
@@ -26,7 +27,8 @@ nmap_t *nmap_make(size_t key_size, size_t value_size, size_t initial_map_size) {
   map->capacity = initial_map_size;
 
   // Set all slots to unused
-  if ((map->in_use = calloc(map->capacity, sizeof(char))) == NULL) return NULL;
+  if ((map->slot_used = calloc(map->capacity, sizeof(bool))) == NULL)
+    return NULL;
   if ((map->slots = malloc(map->capacity * (sizeof(nmap_keypair_t) +
                                             value_size + key_size))) == NULL)
     return NULL;
@@ -44,7 +46,7 @@ nmap_t *nmap_make(size_t key_size, size_t value_size, size_t initial_map_size) {
 }
 
 int nmap_free(nmap_t *map) {
-  free(map->in_use);
+  free(map->slot_used);
   free(map->slots);
   free(map);
   return NMAP_OK;
@@ -54,7 +56,7 @@ void *nmap_find(nmap_t *map, void *key) {
   int find_index;
 
   find_index = nmap_find_index(map, key);
-  if (!map->in_use[find_index]) return NULL;
+  if (!map->slot_used[find_index]) return NULL;
 
   return map->slots[find_index].value;
 }
@@ -69,20 +71,20 @@ int nmap_add(nmap_t *map, nmap_keypair_t *pair) {
   start_at = hash_index;
 
   // Linear probe to end until we find an empty slot
-  while (start_at < map->capacity && map->in_use[start_at]) ++start_at;
+  while (start_at < map->capacity && map->slot_used[start_at]) ++start_at;
 
   // If we didnt expend the list, we found the location. Else, start from
   // beginning of list and loop back to the hash index.
   if (start_at == map->capacity) start_at = 1;
 
   // Linear probe to hash_index until we find an empty slot
-  while (start_at < hash_index && map->in_use[start_at]) ++start_at;
+  while (start_at < hash_index && map->slot_used[start_at]) ++start_at;
 
   // We are guarenteed to have space because of the load factor, so we have
   // no issue just doing this here like so:
   memcpy(map->slots[start_at].key, pair->key, map->key_size);
   memcpy(map->slots[start_at].value, pair->value, map->value_size);
-  map->in_use[start_at] = true;
+  map->slot_used[start_at] = true;
   map->slots_used++;
 
   return NMAP_OK;
@@ -93,7 +95,7 @@ int nmap_remove(nmap_t *map, void *key) {
 
   find_index = nmap_find_index(map, key);
   if (find_index == NMAP_FAIL) return NMAP_FAIL;
-  map->in_use[find_index] = false;
+  map->slot_used[find_index] = false;
   return NMAP_OK;
 }
 
@@ -117,7 +119,7 @@ static int ensure_lf_constraint(nmap_t *map) {
 
   // we move keys over to the new temp_map
   for (old_index = 0; old_index < map->capacity; old_index++) {
-    if (!map->in_use[old_index]) continue;
+    if (!map->slot_used[old_index]) continue;
     if (nmap_add(temp_map, &(nmap_keypair_t){
                                .key = map->slots[old_index].key,
                                .value = map->slots[old_index].value,
@@ -126,11 +128,11 @@ static int ensure_lf_constraint(nmap_t *map) {
   }
 
   // Pointer manipulation to merge old map and new map
-  free(map->in_use);
+  free(map->slot_used);
   free(map->slots);
 
   map->capacity *= 2;
-  map->in_use = temp_map->in_use;
+  map->slot_used = temp_map->slot_used;
   map->slots = temp_map->slots;
 
   free(temp_map);
@@ -160,7 +162,7 @@ static int nmap_find_index(nmap_t *map, void *key) {
 
   // Linear probe from the hash index to end
   start_at = hash_index;
-  while (start_at < map->capacity &&
+  while (start_at < map->capacity && map->slot_used[start_at] &&
          memcmp(map->slots[start_at].key, key, map->key_size) != 0)
     ++start_at;
 

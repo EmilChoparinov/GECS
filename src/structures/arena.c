@@ -7,9 +7,14 @@ Purpose:
 ==============================================================================*/
 #include "arena.h"
 
-#ifndef DISABLE_ARENA
+/* In order to do proper memory leak debugging with valgrind, we must disable
+ * the arena code. Set the DISABLE_ARENA_ALLOC flag to true to convert this
+ * file into a wrapper for malloc. */
+#ifndef DISABLE_ARENA_ALLOC
 
-/*---- DECLARATIONS ----------------------------------------------------------*/
+/*-------------------------------------------------------
+ * Declarations
+ *-------------------------------------------------------*/
 typedef struct region region;
 
 struct arena {
@@ -19,9 +24,7 @@ struct arena {
   size_t region_cnt;
 };
 
-/**
- * @brief The definition of a contiguous region in memory
- */
+/* A region is always continous in memory. */
 struct region {
   /* Last item that was allocated. */
   size_t alloc_pos;
@@ -51,7 +54,9 @@ static void reserve(arena *a, size_t size);
  */
 static void region_destroy(region *r);
 
-/*---- IMPLEMENTATION ----------------------------------------------*/
+/*-------------------------------------------------------
+ * IMPLEMENTATION
+ *-------------------------------------------------------*/
 arena *arena_make(void) {
   arena  *a;
   region *r;
@@ -106,7 +111,9 @@ void arena_refresh(arena *a) {
   a->end = r;
 }
 
-/*---- STATIC FUNCTIONS ------------------------------------------------------*/
+/*-------------------------------------------------------
+ * STATIC FUNCTIONS
+ *-------------------------------------------------------*/
 static region *new_region(void) {
   region *r = malloc(sizeof(region));
   void   *r_mem = malloc(REGION_SIZE);
@@ -152,29 +159,28 @@ static void reserve(arena *a, size_t size) {
 tooling. */
 struct arena {
   /* We preserve the arena's API by keeping track of the mallocs and then
-     freeing them all at once. */
-  vector *mallocs;
+   *  freeing them all at once. This vector contains addresses returned by
+   *  malloc. */
+  short_vec_t *mallocs;
 };
+
 arena *arena_make(void) {
   arena *a;
-  a = malloc(sizeof(a));
-  a->mallocs = vector_make(sizeof(size_t));
-  assert(a);
+  if ((a = malloc(sizeof(*a))) == NULL) return NULL;
+  if ((a->mallocs = short_vec_default(sizeof(void *))) == NULL) return NULL;
   return a;
 }
-void arena_destroy(arena *a) {
-  for (int i = 0; i < vector_len(a->mallocs); i++) {
-    free(*(void **)vector_at(a->mallocs, i));
-  }
-  vector_free(a->mallocs);
-  free(a);
-  return;
+void arena_destroy(arena *arena) {
+  short_vec_free(arena->mallocs);
+  free(arena);
 }
-void *arena_alloc(arena *a, size_t bytes) {
-  void *p = malloc(bytes);
-  vector_push(a->mallocs, &p);
-  return p;
+void *arena_alloc(arena *arena, size_t bytes) {
+  void *reserved_mem;
+  if ((reserved_mem = malloc(bytes)) == NULL) return NULL;
+  short_vec_push(arena->mallocs, reserved_mem);
+  return reserved_mem;
 }
-int  arena_poll(arena *a) { return 0; }
-void arena_refresh(arena *a) { return; }
+int  arena_poll(arena *arena) { return ARENA_OK; }
+void arena_refresh(arena *a) { return ARENA_OK; }
+
 #endif

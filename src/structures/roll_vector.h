@@ -1,3 +1,16 @@
+/* =========================================================================
+    Author: E.D Choparinov, Amsterdam
+    Related Files: roll_vector.h roll_vector.c
+    Created On: April 22 2024
+    Purpose:
+        roll_vector is an extension of the short_vector data structure in
+        which pointer based chunking is supported. See
+        https://en.wikipedia.org/wiki/Unrolled_linked_list which this
+        structure is based on.
+
+        This vector has two modes: stack or be a generic array.
+========================================================================= */
+
 #ifndef __HEADER_ROLL_VECTOR_H__
 #define __HEADER_ROLL_VECTOR_H__
 

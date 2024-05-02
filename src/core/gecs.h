@@ -1,3 +1,12 @@
+/* =========================================================================
+  Author: E.D Choparinov, Amsterdam
+  Related Files: gecs.h gecs.c
+  Created On: April 23 2024
+  Purpose:
+    This is the main file in the gecs framework. Include only this file
+    to access the GECS framework.
+========================================================================= */
+
 #ifndef __HEADER_GECS_H__
 #define __HEADER_GECS_H__
 

@@ -63,7 +63,7 @@ TST_BINS_DIR = tests/bin
 CC = clang
 EXT = .c
 CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG $(INC_DIR)
-TESTFLAGS = 
+TESTFLAGS = -DUNITY_OUTPUT_COLOR
 BUILDFLAGS =
 
 
@@ -136,7 +136,7 @@ test: $(BUILD_FILE_NAME) $(TST_DIR) $(TST_BINS_DIR) $(TST_BINS)
 
 $(TST_BINS_DIR)/%: $(TST_DIR)/%.c
 	@echo + $< -\> $@
-	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) $< $(LIB_FILES) $(BUILD_LIB_FILE) -o $@
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(TESTFLAGS) $< $(LIB_FILES) $(BUILD_LIB_FILE) -o $@
 
 $(TST_DIR):
 	@echo in TST_DIR

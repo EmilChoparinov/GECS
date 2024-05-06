@@ -64,7 +64,7 @@ CC = clang
 EXT = .c
 CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG $(INC_DIR)
 TESTFLAGS = -DUNITY_OUTPUT_COLOR
-BUILDFLAGS =
+BUILDFLAGS = -D_DEBUG
 
 
 #------------------------------------------------------------------------------#

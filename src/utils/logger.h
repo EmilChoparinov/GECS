@@ -42,7 +42,7 @@ enum { LOG_TRACE, LOG_INFO, LOG_DEBUG, LOG_WARN, LOG_ERROR };
  * @param LEVEL the level to set from the log enum values:
  *              LOG_TRACE, LOG_INFO, LOG_DEBUG, LOG_WARN, LOG_ERROR
  */
-void set_level(int LEVEL);
+void log_set_level(int LEVEL);
 
 /*-------------------------------------------------------
  * PRIVATE FUNCTIONS

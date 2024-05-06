@@ -1,5 +1,14 @@
 #include "logger.h"
 
+#ifdef _DEBUG
+/*-------------------------------------------------------
+ * TYPEDEFS AND STATIC FUNCTIONS
+ *-------------------------------------------------------
+ * log_t         - Private structure defined for storing all information
+ *                 required print to the target.
+ * log_to_stdout - Static function that is used to log directly to stdout.
+ *                 Flushes each time (NOT THREAD SAFE!!!!!) */
+
 typedef struct log_t log_t;
 struct log_t {
   int         LEVEL, LINE_NUM;
@@ -9,9 +18,17 @@ struct log_t {
 
 static void log_to_stdout(log_t *log);
 
+/*-------------------------------------------------------
+ * GLOBAL VARIABLES
+ *-------------------------------------------------------
+ * min_level - variable that should be set once in main. All levels under
+ *             min_level will be ignored. */
 int min_level = LOG_TRACE;
 
-void set_level(int LEVEL) { min_level = LEVEL; }
+/*-------------------------------------------------------
+ * LIBRARY IMPLEMENTATION
+ *-------------------------------------------------------*/
+void log_set_level(int LEVEL) { min_level = LEVEL; }
 
 void _cust_log(int LEVEL, const char *FILE, int LINE_NUM, const char *FORMAT,
                ...) {
@@ -25,6 +42,9 @@ void _cust_log(int LEVEL, const char *FILE, int LINE_NUM, const char *FORMAT,
   va_end(log_instance.to_print);
 }
 
+/*-------------------------------------------------------
+ * STATIC FUNCTION IMPLEMENTATION
+ *-------------------------------------------------------*/
 static void log_to_stdout(log_t *log) {
   char       time_buf[16];
   time_t     time_obj;
@@ -42,13 +62,13 @@ static void log_to_stdout(log_t *log) {
     printf(GRN "TRACE " RST);
     break;
   case LOG_INFO:
-    printf(BLU "INFO " RST);
+    printf(BLU "INFO  " RST);
     break;
   case LOG_DEBUG:
     printf(MAG "DEBUG " RST);
     break;
   case LOG_WARN:
-    printf(YEL "WARN " RST);
+    printf(YEL "WARN  " RST);
     break;
   case LOG_ERROR:
     printf(RED "ERROR " RST);
@@ -59,3 +79,14 @@ static void log_to_stdout(log_t *log) {
   vfprintf(stdout, log->FORMAT, log->to_print);
   fflush(stdout);
 }
+#endif
+
+#ifndef _DEBUG
+/*-------------------------------------------------------
+ * DISABLED DEBUGGING FUNCTION IMPLEMENTATIONS
+ *-------------------------------------------------------*/
+void _cust_log(int LEVEL, const char *FILE, int LINE_NUM, const char *FORMAT,
+               ...) {}
+
+void log_set_level(void) {}
+#endif

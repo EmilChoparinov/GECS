@@ -1,8 +1,20 @@
 #include "gecs.h"
+
+/*-------------------------------------------------------
+ * STRUCTS AND TYPE DEFINITIONS
+ *-------------------------------------------------------*/
+
 struct gecs_entity_t {
-  short_vec_t *components; // of pointers to declared components
+  short_vec_t *components; /* of pointers to declared components */
   bool         is_alive;
   gecs_size_t  id;
+};
+
+struct gecs_core_t {
+  gecs_size_t  id_gen;
+  short_vec_t *systems;            /* of gecs_system_t */
+  short_vec_t *entities;           /* of gecs_entity_t */
+  short_vec_t *component_registry; /* of component_t */
 };
 
 typedef struct gecs_component_t gecs_component_t;
@@ -15,20 +27,17 @@ struct gecs_component_t {
 typedef struct gecs_system_t gecs_system_t;
 struct gecs_system_t {
   void (*run_sys)(gecs_entity_t *entt);
-  short_vec_t *components_to_query; // of gecs_size_t id's
+  short_vec_t *components_to_query; /* of gecs_size_t id's */
 };
 
-struct gecs_core_t {
-  gecs_size_t  id_gen;
-  short_vec_t *systems;            // of gecs_system_t
-  short_vec_t *entities;           // of gecs_entity_t
-  short_vec_t *component_registry; // of component_t
-};
+/*-------------------------------------------------------
+ * STATIC FUNCTION DEFINITIONS
+ *-------------------------------------------------------*/
 
 static const gecs_size_t name_to_id(const char *str, const size_t len);
 
 // Comparators
-bool already_added(void *el) { return true; }
+// static bool already_added(void *el) { return true; }
 
 gecs_core_t *gecs_make_world(void) {
   gecs_core_t *world;
@@ -46,6 +55,7 @@ gecs_core_t *gecs_make_world(void) {
 
   return world;
 }
+
 void gecs_progress(gecs_core_t *world) {
   int            itr;
   gecs_system_t *sys;
@@ -54,6 +64,7 @@ void gecs_progress(gecs_core_t *world) {
     sys->run_sys(NULL);
   }
 }
+
 void gecs_complete(gecs_core_t *world) {
   int            itr;
   gecs_system_t *sys;

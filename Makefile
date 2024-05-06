@@ -35,7 +35,7 @@
 #	TST_BINS_DIR:
 #	  - The directory to output each test binary
 #------------------------------------------------------------------------------#
-INC_DIR = -I./libs/ -I./include/ -I./src/structures/ -I./src/core/
+INC_DIR = -I./libs/ -I./include/ -I./src/structures/ -I./src/core/ -I./src/utils
 SRC_DIR = src
 OBJ_DIR = obj
 LIBS_DIR = libs
@@ -119,19 +119,20 @@ $(BUILD_FILE_NAME): $(OBJ_FILES)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%$(EXT)
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
+	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
 
 $(OBJ_DIR)/libs/%.o: $(LIBS_DIR)/%$(EXT)
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
+	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
 
 #------------------------------------------------------------------------------#
 # MAKE TEST					 												   #
 #------------------------------------------------------------------------------#
 test: $(BUILD_FILE_NAME) $(TST_DIR) $(TST_BINS_DIR) $(TST_BINS)
 	@echo Running Tests...
-	@for test in $(TST_BINS) ; do ./$$test --verbose ; done
+	@echo
+	@for test in $(TST_BINS) ; do ./$$test --verbose && echo ; done
 
 $(TST_BINS_DIR)/%: $(TST_DIR)/%.c
 	@echo + $< -\> $@
@@ -195,8 +196,7 @@ env:
 #------------------------------------------------------------------------------#
 .PHONY: clean
 clean:
-	@echo "Cleaning /obj/*, /tests/bin/*, $(BUILD_LIB_FILE), .."
-	@echo $(TST_BINS)
+	@echo "Cleaning /$(OBJ_DIR)/* /$(TST_BINS_DIR)/* $(BUILD_LIB_FILE)"
 	@rm -r -f $(BUILD_LIB_FILE)
 	@rm -r -f $(OBJ_DIR)
 	@rm -r -f $(TST_BINS_DIR)

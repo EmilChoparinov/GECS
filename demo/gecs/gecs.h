@@ -45,6 +45,9 @@ typedef struct gecs_core_t gecs_core_t;
  *  gecs_core_t struct. */
 typedef struct gecs_entity_t gecs_entity_t;
 
+/* This hidden struct contains information used during system progression. */
+typedef struct gecs_q_t gecs_q_t;
+
 /*-------------------------------------------------------
  * FRAMEWORK METADATA COLLECTION STRUCTS
  *-------------------------------------------------------
@@ -62,12 +65,6 @@ struct gecs_component_info_t {
 
   size_t name_len;
   size_t component_size;
-};
-
-typedef struct gecs_system_info_t gecs_system_info_t;
-struct gecs_system_info_t {
-  void (*sys)(gecs_entity_t *entt);
-  char *component_names[]; /* use NULL sentinel at the end. */
 };
 
 /*-------------------------------------------------------
@@ -133,7 +130,7 @@ int gecs_register_component(gecs_core_t *world, gecs_component_info_t *info);
  * @param info The metadata related to the system to be added
  * @return GECS_OK, GECS_FAIL
  */
-int gecs_register_system(gecs_core_t *world, gecs_system_info_t *info);
+int gecs_register_system(gecs_core_t *world, void (*sys)(gecs_q_t *q));
 
 /**
  * @brief Creates a new and empty entity
@@ -141,18 +138,28 @@ int gecs_register_system(gecs_core_t *world, gecs_system_info_t *info);
  * @param world The world the entity will spawn from
  * @return gecs_entity_t* Direct reference pointer to the entity
  */
-gecs_entity_t *gecs_make_entity(gecs_core_t *world);
+gecs_size_t gecs_make_entity(gecs_core_t *world);
 
 /**
  * @brief Add a new component to world
  *
  * @param world The world to add to
- * @param entt The entity to add the component to
+ * @param entt_id The entity to add to
  * @param component_name The component name to add to the entity
  * @param len The length of the component name
  * @return GECS_OK, GECS_FAIL
  */
-int gecs_add_component(gecs_core_t *world, gecs_entity_t *entt,
+int gecs_add_component(gecs_core_t *world, gecs_size_t entt_id,
                        const char *component_name, const size_t len);
+
+/*-------------------------------------------------------
+ * ECS GECS QUERY FUNCTIONS
+ *-------------------------------------------------------*/
+int gecs_q_define(gecs_q_t *q, char *component_names[]);
+
+short_vec_t *gecs_q_select_sub_entities(gecs_q_t *q);
+
+void *gecs_entity_get(gecs_entity_t *entt, char *name);
+void *gecs_entity_get_by_id(gecs_core_t *world, gecs_size_t id, char *name);
 
 #endif

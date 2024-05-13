@@ -206,7 +206,7 @@ env:
 	@docker build -t gecs-image .
 	@echo "Done!"
 	@echo "Running container for the first time..."
-	@docker run -it -v "$(pwd):/virtual" --name gecs-container gecs-image
+	@docker run -it -v ".:/virtual" --name gecs-container gecs-image
 
 #------------------------------------------------------------------------------#
 # MAKE CLEAN																   #

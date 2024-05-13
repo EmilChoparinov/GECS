@@ -35,9 +35,12 @@ struct gecs_system_t {
  *-------------------------------------------------------*/
 
 static const gecs_size_t name_to_id(const char *str, const size_t len);
+static const bool world_has_component(const gecs_core_t *world, char *name,
+                                      size_t len);
 
-// Comparators
-// static bool already_added(void *el) { return true; }
+/*-------------------------------------------------------
+ * MAIN WORLD FUNCTIONS
+ *-------------------------------------------------------*/
 
 gecs_core_t *gecs_make_world(void) {
   gecs_core_t *world;
@@ -57,11 +60,55 @@ gecs_core_t *gecs_make_world(void) {
 }
 
 void gecs_progress(gecs_core_t *world) {
-  int            itr;
-  gecs_system_t *sys;
-  for (itr = 0; itr < short_vec_len(world->systems); itr++) {
-    sys = (gecs_system_t *)short_vec_at(world->systems, itr);
-    sys->run_sys(NULL);
+  /** Progression Algorithm:
+   *    1. Linear iteration through all systems in REGISTRATION ORDER
+   *    2. Linear iteration through all entities in REGISTRATION ORDER
+   *    3. For each entity, check if the entities components are a subset of
+   *       the components list for the system.
+   *    5. If yes, run the entity through the system
+   *    6. If no, skip the system and move on to next entity
+   */
+
+  int itr_sys, itr_entt, itr_sys_comp, itr_comp, sys_cnt, entt_cnt, comp_cnt,
+      sys_comp_cnt;
+
+  bool is_subset;
+
+  gecs_size_t       id_sub, id_super;
+  gecs_system_t    *sys;
+  gecs_entity_t    *entt;
+  gecs_component_t *comp;
+
+  sys_cnt = short_vec_len(world->systems);
+  entt_cnt = short_vec_len(world->entities);
+  for (itr_sys = 0; itr_sys < sys_cnt; itr_sys++) {
+    sys = (gecs_system_t *)short_vec_at(world->systems, itr_sys);
+    for (itr_entt = 0; itr_entt < entt_cnt; itr_entt++) {
+      entt = (gecs_entity_t *)short_vec_at(world->entities, itr_entt);
+
+      /* Subset check. */
+      is_subset = false;
+      comp_cnt = short_vec_len(entt->components);
+      for (itr_comp = 0; itr_comp < comp_cnt; itr_comp++) {
+        comp = (gecs_component_t *)short_vec_at(entt->components, itr_comp);
+        id_sub = comp->name_hash;
+
+        /* Find match. */
+        sys_comp_cnt = short_vec_len(sys->components_to_query);
+        for (itr_sys_comp = 0; itr_sys_comp < sys_comp_cnt; itr_sys_comp++) {
+          id_super = short_vec_at(sys->components_to_query, itr_sys_comp);
+
+          /* Found. */
+          if (id_sub == id_super) {
+            sys->run_sys(entt);
+            is_subset = true;
+            break;
+          }
+        }
+
+        if (!is_subset) break;
+      }
+    }
   }
 }
 
@@ -86,6 +133,10 @@ void gecs_complete(gecs_core_t *world) {
   short_vec_free(world->systems);
 }
 
+/*-------------------------------------------------------
+ * REGISTRATION FUNCTIONS
+ *-------------------------------------------------------*/
+
 int gecs_register_component(gecs_core_t *world, gecs_component_info_t *info) {
   int         reg_len, itr;
   gecs_size_t name_to_add;
@@ -93,12 +144,7 @@ int gecs_register_component(gecs_core_t *world, gecs_component_info_t *info) {
   name_to_add = name_to_id(info->name, info->name_len);
 
   // Check to make sure there exists no other component with the same name/id.
-  reg_len = short_vec_len(world->component_registry);
-  for (itr = 0; itr < reg_len; itr++) {
-    if (((gecs_component_t *)short_vec_at(world->component_registry, itr))
-            ->name_hash == name_to_add)
-      return GECS_FAIL;
-  }
+  if (world_has_component(world, info->name, info->name_len)) return GECS_FAIL;
 
   short_vec_push(world->component_registry,
                  &(gecs_component_t){.component_size = info->component_size,
@@ -106,6 +152,39 @@ int gecs_register_component(gecs_core_t *world, gecs_component_info_t *info) {
                                      .component = NULL});
   return GECS_OK;
 }
+
+int gecs_register_system(gecs_core_t *world, gecs_system_info_t *info) {
+
+  int         itr;
+  gecs_size_t component_id;
+  char       *component_name;
+
+  short_vec_t  *comp_ids;
+  gecs_system_t gec_sys;
+
+  /* Check to make sure each component has already been registered. */
+  comp_ids = short_vec_default(sizeof(gecs_size_t));
+  for (itr = 0; info->component_names[itr] != NULL; itr++) {
+    component_name = info->component_names[itr];
+    component_id = name_to_id(component_name, strlen(component_name));
+
+    if (!world_has_component(world, component_name, strlen(component_name)))
+      return GECS_FAIL;
+
+    short_vec_push(comp_ids, &component_id);
+  }
+
+  gec_sys.components_to_query = comp_ids;
+  gec_sys.run_sys = info->sys;
+
+  short_vec_push(world->systems, &gec_sys);
+
+  return GECS_OK;
+}
+
+/*-------------------------------------------------------
+ * ENTITY MANIPULATION FUNCTIONS
+ *-------------------------------------------------------*/
 
 gecs_entity_t *gecs_make_entity(gecs_core_t *world) {
   gecs_entity_t *entt;
@@ -119,8 +198,8 @@ gecs_entity_t *gecs_make_entity(gecs_core_t *world) {
   short_vec_push(world->entities, entt);
 
   // We free entt and not components because short_vec_push will do a shallow
-  // copy of the memory of the struct but not the pointers pointing outside the
-  // struct
+  // copy of the memory of the struct but not the pointers pointing outside
+  // the struct
   free(entt);
 
   return entt;
@@ -173,8 +252,6 @@ int gecs_add_component(gecs_core_t *world, gecs_entity_t *entt,
   return GECS_OK;
 }
 
-// int gecs_register_system(gecs_core_t *world, gecs_system_info_t *info) {}
-
 static const gecs_size_t name_to_id(const char *str, const size_t len) {
   char *hash_str;
   if ((hash_str = malloc(sizeof(*hash_str) * len + 1)) == NULL)
@@ -183,4 +260,21 @@ static const gecs_size_t name_to_id(const char *str, const size_t len) {
   hash_str[len] = '\0';
   free(hash_str);
   return hash(hash_str);
+}
+
+static const bool world_has_component(const gecs_core_t *world, char *name,
+                                      size_t len) {
+  int         reg_len, itr;
+  gecs_size_t comp_id;
+
+  comp_id = name_to_id(name, len);
+
+  reg_len = short_vec_len(world->component_registry);
+  for (itr = 0; itr < reg_len; itr++) {
+    if (((gecs_component_t *)short_vec_at(world->component_registry, itr))
+            ->name_hash == comp_id)
+      return true;
+  }
+
+  return false;
 }

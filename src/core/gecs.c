@@ -74,7 +74,7 @@ void gecs_progress(gecs_core_t *world) {
 
   bool is_subset;
 
-  gecs_size_t       id_sub, id_super;
+  gecs_size_t       id_sub, *id_super;
   gecs_system_t    *sys;
   gecs_entity_t    *entt;
   gecs_component_t *comp;
@@ -96,10 +96,11 @@ void gecs_progress(gecs_core_t *world) {
         /* Find match. */
         sys_comp_cnt = short_vec_len(sys->components_to_query);
         for (itr_sys_comp = 0; itr_sys_comp < sys_comp_cnt; itr_sys_comp++) {
-          id_super = short_vec_at(sys->components_to_query, itr_sys_comp);
+          id_super = (gecs_size_t *)short_vec_at(sys->components_to_query,
+                                                 itr_sys_comp);
 
           /* Found. */
-          if (id_sub == id_super) {
+          if (id_sub == *id_super) {
             sys->run_sys(entt);
             is_subset = true;
             break;
@@ -138,7 +139,6 @@ void gecs_complete(gecs_core_t *world) {
  *-------------------------------------------------------*/
 
 int gecs_register_component(gecs_core_t *world, gecs_component_info_t *info) {
-  int         reg_len, itr;
   gecs_size_t name_to_add;
 
   name_to_add = name_to_id(info->name, info->name_len);

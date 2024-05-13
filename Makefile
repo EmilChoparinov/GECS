@@ -7,6 +7,8 @@
 #
 #	USAGE:
 #	make all    | Builds into a *.a binary for linking.
+#	make pkg	| Builds into a zip containing the *.a binary and *.h files.
+#	make demo   | Builds the demo which can be run by the user.
 #	make test   | Runs all tests in the test directory.
 #	make env	| Build a new docker image compatible with compiling.
 #	make docker | Enters a docker environment compatible with compiling.
@@ -62,10 +64,11 @@ TST_BINS_DIR = tests/bin
 #------------------------------------------------------------------------------#
 CC = clang
 EXT = .c
+EXT_HDR = .h
+EXT_ARCHIVE = .a
 CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG $(INC_DIR)
 TESTFLAGS = -DUNITY_OUTPUT_COLOR
 BUILDFLAGS = -D_DEBUG
-
 
 #------------------------------------------------------------------------------#
 # PROJECT CONFIGURATIONS													   #
@@ -76,7 +79,8 @@ BUILDFLAGS = -D_DEBUG
 #	  - The full path to where the output file will live.
 #------------------------------------------------------------------------------#
 BUILD_FILE_NAME = libgecs
-BUILD_LIB_FILE   = $(BUILD_DIR)/$(BUILD_FILE_NAME).a
+BUILD_LIB_FILE   = $(BUILD_DIR)/$(BUILD_FILE_NAME)$(EXT_ARCHIVE)
+PACKG_ZIP_FILE = $(BUILD_FILE_NAME).zip
 
 #------------------------------------------------------------------------------#
 # PROJECT FILE COLLETION													   #
@@ -97,10 +101,16 @@ BUILD_LIB_FILE   = $(BUILD_DIR)/$(BUILD_FILE_NAME).a
 #	  - Contains a list of all output locations for the testing binaries.
 #------------------------------------------------------------------------------#
 SRC_FILES = $(shell find $(SRC_DIR) -name "*$(EXT)")
+HDR_FILES = $(shell find $(SRC_DIR) -name "*$(EXT_HDR)")
 LIB_FILES = $(wildcard $(LIBS_DIR)/*.c)
 TST_FILES = $(wildcard $(TST_DIR)/*.c)
 OBJ_FILES = $(SRC_FILES:$(SRC_DIR)/%$(EXT)=$(OBJ_DIR)/%.o) $(LIB_FILES:$(LIBS_DIR)/%$(EXT)=$(OBJ_DIR)/libs/%.o)
 TST_BINS=$(patsubst $(TST_DIR)/%.c, $(TST_BINS_DIR)/%, $(TST_FILES))
+
+#------------------------------------------------------------------------------#
+# EXTERNAL MAKEFILES					 												   #
+#------------------------------------------------------------------------------#
+include demo.mk
 
 #------------------------------------------------------------------------------#
 # MAKE ALL					 												   #
@@ -125,6 +135,13 @@ $(OBJ_DIR)/libs/%.o: $(LIBS_DIR)/%$(EXT)
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
 	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
+
+#------------------------------------------------------------------------------#
+# MAKE PKG					 												   #
+#------------------------------------------------------------------------------#
+pkg: all 
+	@echo "Packaging..."
+	zip -j $(PACKG_ZIP_FILE) $(HDR_FILES) $(BUILD_LIB_FILE)
 
 #------------------------------------------------------------------------------#
 # MAKE TEST					 												   #
@@ -200,3 +217,4 @@ clean:
 	@rm -r -f $(BUILD_LIB_FILE)
 	@rm -r -f $(OBJ_DIR)
 	@rm -r -f $(TST_BINS_DIR)
+	@rm -r -f $(PACKG_ZIP_FILE)

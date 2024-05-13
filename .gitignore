@@ -1,5 +1,8 @@
 ### Project Specific ###
 tests/bin/**
+run_demo
+libgecs.a
+libgecs.zip
 
 ### C ###
 # Prerequisites

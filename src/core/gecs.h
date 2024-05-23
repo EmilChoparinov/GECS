@@ -158,6 +158,7 @@ int gecs_add_component(gecs_core_t *world, gecs_size_t entt_id,
 int gecs_q_define(gecs_q_t *q, char *component_names[]);
 
 short_vec_t *gecs_q_select_sub_entities(gecs_q_t *q);
+short_vec_t *gecs_q_select_from_components(gecs_q_t *q, char *comp_names[]);
 
 void *gecs_entity_get(gecs_entity_t *entt, char *name);
 void *gecs_entity_get_by_id(gecs_core_t *world, gecs_size_t id, char *name);

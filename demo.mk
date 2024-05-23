@@ -11,6 +11,7 @@
 DEMO_GECS_DIR = ./demo/gecs/
 DEMO_INC_DIR = -I$(DEMO_GECS_DIR)
 DEMO_CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG $(DEMO_INC_DIR)
+DEMO_LIBS = -lcurses
 DEMO_SRC_DIR = demo
 DEMO_OBJ_DIR = demo_obj
 DEMO_BUILD_DIR = .
@@ -29,7 +30,7 @@ demo: pkg demo_pre $(DEMO_BUILD_FILE_NAME)_BUILD_PROC
 
 $(DEMO_BUILD_FILE_NAME)_BUILD_PROC: $(DEMO_OBJ_FILES)
 	@echo Bundling...
-	$(CC) $(DEMO_CXXFLAGS) -o $(DEMO_BUILD_FILE_NAME) $^
+	$(CC) $(DEMO_CXXFLAGS) $(DEMO_LIBS) -o $(DEMO_BUILD_FILE_NAME) $^
 	@echo Done! GLHF
 
 demo_pre:

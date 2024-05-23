@@ -260,6 +260,41 @@ short_vec_t *gecs_q_select_sub_entities(gecs_q_t *q) {
   return output;
 }
 
+short_vec_t *gecs_q_select_from_components(gecs_q_t *q, char *comp_names[]) {
+  short_vec_t *output;
+
+  output = short_vec_make(sizeof(gecs_entity_t *), 1);
+
+  for (int i_entt = 0; i_entt < short_vec_len(q->world->entities); i_entt++) {
+    gecs_entity_t *entt = short_vec_at(q->world->entities, i_entt);
+
+    bool contains_all_matches = true;
+    for (int i_req = 0; comp_names[i_req] != NULL; i_req++) {
+      gecs_size_t requires_id =
+          name_to_id(comp_names[i_req], strlen(comp_names[i_req]));
+
+      bool found_match = false;
+      for (int i_comp = 0; i_comp < short_vec_len(entt->components); i_comp++) {
+        gecs_component_t *comp = short_vec_at(entt->components, i_comp);
+
+        if (comp->name_hash == requires_id) {
+          found_match = true;
+          break;
+        }
+      }
+
+      if (!found_match) {
+        contains_all_matches = false;
+        break;
+      }
+    }
+
+    if (contains_all_matches) short_vec_push(output, entt);
+  }
+
+  return output;
+}
+
 void *gecs_entity_get_by_id(gecs_core_t *world, gecs_size_t id, char *name) {
   return gecs_entity_get(gecs_id_to_entt(world, id), name);
 }

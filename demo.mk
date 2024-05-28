@@ -30,7 +30,7 @@ demo: pkg demo_pre $(DEMO_BUILD_FILE_NAME)_BUILD_PROC
 
 $(DEMO_BUILD_FILE_NAME)_BUILD_PROC: $(DEMO_OBJ_FILES)
 	@echo Bundling...
-	$(CC) $(DEMO_CXXFLAGS) $(DEMO_LIBS) -o $(DEMO_BUILD_FILE_NAME) $^
+	$(CC) $(DEMO_CXXFLAGS) -o $(DEMO_BUILD_FILE_NAME) $^ $(DEMO_LIBS)
 	@echo Done! GLHF
 
 demo_pre:

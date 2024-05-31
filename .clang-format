@@ -1,5 +1,6 @@
 BasedOnStyle: LLVM
 AlignConsecutiveDeclarations: true
+AlignConsecutiveMacros: true
 IndentWidth: 2
 ColumnLimit: 80
 AllowShortIfStatementsOnASingleLine: true

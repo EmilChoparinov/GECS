@@ -62,7 +62,7 @@ TST_BINS_DIR = tests/bin
 #	LDFLAGS:
 #	  - 
 #------------------------------------------------------------------------------#
-CC = gcc
+CC = clang
 EXT = .c
 EXT_HDR = .h
 EXT_ARCHIVE = .a

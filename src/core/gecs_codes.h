@@ -10,7 +10,7 @@
 #ifndef __HEADER__GECS_CODES_H__
 #define __HEADER__GECS_CODES_H__
 
-typedef enum gecs_retcode gecs_retcode;
-enum gecs_retcode { GECS_OKAY, GECS_FAIL };
+typedef enum retcode retcode;
+enum retcode { R_OKAY, R_FAIL };
 
 #endif

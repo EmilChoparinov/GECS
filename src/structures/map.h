@@ -31,7 +31,7 @@ typedef bool m_bool;
 VECTOR_GEN_H(m_bool);
 VECTOR_GEN_C(m_bool);
 
-#define MAP_DEFAULT_SIZE 256
+#define MAP_DEFAULT_SIZE 16
 #define MAP_LOAD_FACTOR  0.75f
 
 #define map_pair(Ta, Tb)       Ta##_##Tb

@@ -16,7 +16,8 @@
 
 #include "funcdef.h"
 #include "gecs_codes.h"
-#include "map.h"
+#include "map.h" /* This implementation relies on the map structure so 
+                    file is **NOT** standalone. */
 
 #define set_t(T)      T##_set_t
 #define set_access(T) wrap_set_##T##_char_map_t
@@ -91,6 +92,7 @@
                                                                                \
   bool    is_true(bool *b) { return *b; }                                      \
   int64_t fname(T, set_count)(set_t(T) * s) { return s->map.slots_in_use; }    \
+                                                                               \
   /*-------------------------------------------------------                    \
    * Element Operations                                                        \
    *-------------------------------------------------------*/                  \

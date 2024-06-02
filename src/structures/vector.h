@@ -108,10 +108,11 @@
     if (size < v->__size) return R_OKAY;                                       \
     int64_t old_size = v->__size;                                              \
     while (size >= v->__size) v->__size *= 2;                                  \
-    v->element_head = realloc(v->element_head, v->__size * sizeof(T));         \
-    assert(v->element_head);                                                   \
-    memset((char *)v->element_head + old_size * sizeof(T), 0,                  \
-           v->__size * sizeof(T) - old_size * sizeof(T));                      \
+    void *new_addr = calloc(v->__size * sizeof(T), 1);                         \
+    assert(new_addr);                                                          \
+    memcpy(new_addr, v->element_head, old_size * sizeof(T));                   \
+    free(v->element_head);                                                     \
+    v->element_head = new_addr;                                                \
     return R_OKAY;                                                             \
   }                                                                            \
                                                                                \

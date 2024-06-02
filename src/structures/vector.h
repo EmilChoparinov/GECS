@@ -47,6 +47,8 @@
   fdecl(vector_t(T) *, T, vec_heap_init, (void));                              \
   fdecl(void, T, vec_heap_free, (vector_t(T) * v));                            \
   fdecl(retcode, T, vec_resize, (vector_t(T) * v, int64_t size));              \
+  fdecl(retcode, T, vec_copy, (vector_t(T) * dest, vector_t(T) * src));        \
+  fdecl(retcode, T, vec_clear, (vector_t(T) * v));                             \
                                                                                \
   /*------------------------------------------------------- \                  \
    * Element Operations                                                        \
@@ -57,8 +59,6 @@
   fdecl(retcode, T, vec_push, (vector_t(T) * v, T * element));                 \
   fdecl(void, T, vec_pop, (vector_t(T) * v));                                  \
   fdecl(T *, T, vec_top, (vector_t(T) * v));                                   \
-  fdecl(retcode, T, vec_copy, (vector_t(T) * dest, vector_t(T) * src));        \
-  fdecl(retcode, T, vec_clear, (vector_t(T) * v));                             \
                                                                                \
   /*-------------------------------------------------------                    \
    * Functional Operations                                                     \

@@ -179,6 +179,10 @@ VECTOR_GEN_C(m_bool);
         map_access(Ta, Tb, put)(&m->map, idx, &item);                          \
         return R_OKAY;                                                         \
       }                                                                        \
+      /* We need to check slots as we go to prevent duplicates. */             \
+      if (memcmp(&map_access(Ta, Tb, at)(&m->map, idx)->key, key,              \
+                 sizeof(*key)) == 0)                                           \
+        return R_FAIL;                                                         \
     }                                                                          \
                                                                                \
     /* Probe failed, go to zero and probe to start_idx. */                     \
@@ -189,6 +193,10 @@ VECTOR_GEN_C(m_bool);
         map_access(Ta, Tb, put)(&m->map, idx, &item);                          \
         return R_OKAY;                                                         \
       }                                                                        \
+                                                                               \
+      if (memcmp(&map_access(Ta, Tb, at)(&m->map, idx)->key, key,              \
+                 sizeof(*key)) == 0)                                           \
+        return R_FAIL;                                                         \
     }                                                                          \
                                                                                \
     /* This should be impossible to reach due to the load factor constraint.   \

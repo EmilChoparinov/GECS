@@ -12,11 +12,11 @@
 /*-------------------------------------------------------
  * Atomic Function Types
  *-------------------------------------------------------*/
-#define pred_f(T)   T##_predicate
-#define unary_f(T)  T##_unary
-#define binary_f(T) T##_binary
-#define ret(T)      T
-
+#define pred_f(T)          T##_predicate
+#define unary_f(T)         T##_unary
+#define binary_f(T)        T##_binary
+#define ret(T)             T
+#define wrap_type(T, with) wrap_##with##_##T
 
 /*-------------------------------------------------------
  * Function Reference Macros
@@ -27,8 +27,8 @@
 /*-------------------------------------------------------
  * Utilities
  *-------------------------------------------------------*/
-#define EXPAND(x) x
-#define CONCAT(a,b) a##b
-#define UNIQUE(x) CONCAT(x, __LINE__)
+#define EXPAND(x)    x
+#define CONCAT(a, b) a##b
+#define UNIQUE(x)    CONCAT(x, __LINE__)
 
 #endif

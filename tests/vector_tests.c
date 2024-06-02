@@ -14,9 +14,9 @@ VECTOR_GEN_C(cs);
  * REGISTER
  *-------------------------------------------------------*/
 
-vec_cs_t vector;
-void     setUp(void) { vec_cs_init(&vector); }
-void     tearDown(void) { vec_cs_free(&vector); }
+cs_vec_t vector;
+void     setUp(void) { cs_vec_init(&vector); }
+void     tearDown(void) { cs_vec_free(&vector); }
 
 void push_pop_clear_256(void);
 void count_5_circles(void);
@@ -48,27 +48,27 @@ int main(void) {
 
 void push_pop_clear_256(void) {
   for (int i = 0; i < 256; i++) {
-    vec_cs_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
-    TEST_ASSERT(vec_cs_top(&vector)->x == i);
+    cs_vec_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
+    TEST_ASSERT(cs_vec_top(&vector)->x == i);
   }
 
   for (int i = 255; i >= 0; i--) {
-    TEST_ASSERT(vec_cs_top(&vector)->x == i);
-    vec_cs_pop(&vector);
+    TEST_ASSERT(cs_vec_top(&vector)->x == i);
+    cs_vec_pop(&vector);
   }
 
   TEST_ASSERT(vector.length == 0);
-  vec_cs_push(&vector, &(cs){.y = 99});
-  vec_cs_clear(&vector);
-  vec_cs_push(&vector, &(cs){.y = 999});
-  TEST_ASSERT(vec_cs_top(&vector)->y == 999);
+  cs_vec_push(&vector, &(cs){.y = 99});
+  cs_vec_clear(&vector);
+  cs_vec_push(&vector, &(cs){.y = 999});
+  TEST_ASSERT(cs_vec_top(&vector)->y == 999);
 }
 void count_5_circles(void) {
-  vec_cs_resize(&vector, 10);
+  cs_vec_resize(&vector, 10);
   for (int circle_run = 1; circle_run <= 5; circle_run++) {
     for (int i = 0; i < 10; i++) {
-      vec_cs_put(&vector, i, &(cs){.x = circle_run * 10 + i});
-      TEST_ASSERT(vec_cs_at(&vector, i)->x = circle_run * 10 + i);
+      cs_vec_put(&vector, i, &(cs){.x = circle_run * 10 + i});
+      TEST_ASSERT(cs_vec_at(&vector, i)->x = circle_run * 10 + i);
     }
   }
 }
@@ -78,29 +78,29 @@ bool find_100(cs *a) { return a->x == 100; }
 
 void has_random_element(void) {
   for (int i = 0; i < 100; i++) {
-    vec_cs_push(&vector, &(cs){.x = i});
+    cs_vec_push(&vector, &(cs){.x = i});
   }
 
-  vec_cs_t copy;
-  vec_cs_copy(vec_cs_init(&copy), &vector);
+  cs_vec_t copy;
+  cs_vec_copy(cs_vec_init(&copy), &vector);
 
-  vec_cs_filter(&vector, find_5);
-  vec_cs_filter(&copy, find_100);
+  cs_vec_filter(&vector, find_5);
+  cs_vec_filter(&copy, find_100);
 
   TEST_ASSERT(vector.length == 1);
   TEST_ASSERT(copy.length == 0);
 
-  vec_cs_free(&copy);
+  cs_vec_free(&copy);
 }
 
 bool is_mult_10(cs *a) { return a->x % 10 == 0; }
 
 void count_multiples_of_10_to_100(void) {
   for (int i = 0; i < 100; i++) {
-    vec_cs_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
+    cs_vec_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
   }
 
-  vec_cs_filter(&vector, is_mult_10);
+  cs_vec_filter(&vector, is_mult_10);
   TEST_ASSERT(vector.length == 10);
 }
 
@@ -110,11 +110,11 @@ cs adder(cs residual, cs *next) {
 }
 void filter_multiples_of_10_and_sum(void) {
   for (int i = 0; i < 100; i++) {
-    vec_cs_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
+    cs_vec_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
   }
 
   cs sum =
-      vec_cs_foldl(vec_cs_filter(&vector, is_mult_10), adder, (cs){.x = 0});
+      cs_vec_foldl(cs_vec_filter(&vector, is_mult_10), adder, (cs){.x = 0});
   TEST_ASSERT(sum.x == 450);
 }
 
@@ -126,16 +126,16 @@ cs divide_2(cs a) {
 bool is_mult_2(cs *a) { return a->x % 2 == 0; }
 void divide_all_even_numbers_by_2_under_100(void) {
   for (int i = 0; i < 100; i++) {
-    vec_cs_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
+    cs_vec_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
   }
 
-  vec_cs_map(vec_cs_filter(&vector, is_mult_2), divide_2);
+  cs_vec_map(cs_vec_filter(&vector, is_mult_2), divide_2);
 
   int indexer = 0;
   int counter = 0;
   for (int i = 0; i < 100; i++) {
     if (i % 2 == 0) {
-      TEST_ASSERT(vec_cs_at(&vector, indexer)->x == i / 2);
+      TEST_ASSERT(cs_vec_at(&vector, indexer)->x == i / 2);
       indexer++;
       counter++;
     }
@@ -154,15 +154,15 @@ cs activate(cs a) {
 }
 void add_one_to_odds_and_set_all_evens_to_active(void) {
   for (int i = 0; i < 100; i++) {
-    vec_cs_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
+    cs_vec_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
   }
 
-  vec_cs_t all_active;
-  vec_cs_copy(vec_cs_init(&all_active), &vector);
+  cs_vec_t all_active;
+  cs_vec_copy(cs_vec_init(&all_active), &vector);
 
-  vec_cs_filter(vec_cs_map(vec_cs_map(&all_active, to_odd_map), activate),
+  cs_vec_filter(cs_vec_map(cs_vec_map(&all_active, to_odd_map), activate),
                 is_active);
 
   TEST_ASSERT(all_active.length == vector.length);
-  vec_cs_free(&all_active);
+  cs_vec_free(&all_active);
 }

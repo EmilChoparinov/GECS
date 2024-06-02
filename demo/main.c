@@ -1,26 +1,23 @@
 #include <stdio.h>
 
+#include "map.h"
+
+typedef struct vec2d vec2d;
+struct vec2d {
+  int x, y;
+};
+
+MAP_GEN_H(int, vec2d);
+MAP_GEN_C(int, vec2d);
+
 int main(void) {
-  // galloc_t *alloc = galloc_init();
+  int_vec2d_map_t *map = int_vec2d_map_heap_init();
 
-  // int *x = galloc(alloc, sizeof(int));
-  // *x = 5;
-  // int *b = galloc(alloc, sizeof(int));
-  // *b = 5;
-  // int *c = galloc(alloc, sizeof(int));
-  // *c = 5;
-  // int *d = galloc(alloc, sizeof(int));
-  // *d = 5;
-  // int *e = galloc(alloc, sizeof(int));
-  // *e = 5;
+  // for (int i = 0; i < 500; i++) {
+  //   int_vec2d_map_put(map, &i, &(vec2d){.x = i, .y = i});
+  // }
 
-  // printf("x: %d\n", *x);
-  // printf("b: %d\n", *b);
-  // printf("c: %d\n", *c);
-  // printf("d: %d\n", *d);
-  // printf("e: %d\n", *e);
-
-  // galloc_free(alloc);
+  int_vec2d_map_heap_free(map);
 
   return 0;
 }

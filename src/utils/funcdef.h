@@ -28,5 +28,7 @@
  * Utilities
  *-------------------------------------------------------*/
 #define EXPAND(x) x
+#define CONCAT(a,b) a##b
+#define UNIQUE(x) CONCAT(x, __LINE__)
 
 #endif

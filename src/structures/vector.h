@@ -21,7 +21,10 @@
 
 #define vector_t(T) T##_vec_t
 
+// This internal type does **not** matter! We only want the type info.
 typedef void *any;
+
+#define of_any(X) (void *)(X)
 
 #define VECTOR_GEN_H(T)                                                        \
   /*-------------------------------------------------------                    \
@@ -76,6 +79,7 @@ typedef void *any;
   static void fname(T, assert_init_checks)(vector_t(T) * v);                   \
   static void fname(T, bound_assert_checks)(vector_t(T) * v, int64_t i);       \
   static ret(vector_t(T) *) fname(T, vec_construct)(vector_t(T) * v);          \
+  static ret(T *) fname(T, _d_vec_at)(vector_t(T) * v, int64_t i);             \
                                                                                \
   ret(vector_t(T) *) fname(T, vec_construct)(vector_t(T) * v) {                \
     v->length = 0;                                                             \
@@ -129,7 +133,7 @@ typedef void *any;
                                                                                \
   ret(T *) fname(T, vec_at)(vector_t(T) * v, int64_t i) {                      \
     fname(T, bound_assert_checks)(v, i);                                       \
-    return &v->element_head[i];                                                \
+    return fname(T, _d_vec_at)(v, i);                                          \
   }                                                                            \
                                                                                \
   ret(retcode) fname(T, vec_put)(vector_t(T) * v, int64_t i, T * element) {    \
@@ -146,7 +150,7 @@ typedef void *any;
     assert(element);                                                           \
                                                                                \
     for (int64_t i = 0; i < v->length; i++)                                    \
-      if (memcmp(element, &v->element_head[i], v->__el_size) == 0)             \
+      if (memcmp(element, fname(T, vec_at)(v, i), v->__el_size) == 0)          \
         return true;                                                           \
     return false;                                                              \
   }                                                                            \
@@ -156,7 +160,7 @@ typedef void *any;
     assert(element);                                                           \
     bool ret = fname(T, vec_resize)(v, v->length) == R_OKAY;                   \
     assert(ret);                                                               \
-    memmove(&v->element_head[v->__top], element, v->__el_size);                \
+    memmove(fname(T, _d_vec_at)(v, v->__top), element, v->__el_size);          \
     v->__top++;                                                                \
     if (v->__top >= v->length) v->length = v->__top;                           \
     return ret;                                                                \
@@ -171,7 +175,7 @@ typedef void *any;
                                                                                \
   ret(T *) fname(T, vec_top)(vector_t(T) * v) {                                \
     fname(T, assert_init_checks)(v);                                           \
-    return &v->element_head[v->__top - 1];                                     \
+    return fname(T, vec_at)(v, v->__top - 1);                                  \
   }                                                                            \
                                                                                \
   ret(retcode) fname(T, vec_copy)(vector_t(T) * dest, vector_t(T) * src) {     \
@@ -248,6 +252,9 @@ typedef void *any;
   static ret(void) fname(T, bound_assert_checks)(vector_t(T) * v, int64_t i) { \
     fname(T, assert_init_checks)(v);                                           \
     assert(i >= 0 && i < v->length);                                           \
+  }                                                                            \
+  static ret(T *) fname(T, _d_vec_at)(vector_t(T) * v, int64_t i) {            \
+    return (void *)(v->element_head) + i * v->__el_size;                       \
   }
 
 VECTOR_GEN_H(any);

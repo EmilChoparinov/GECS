@@ -1,3 +1,5 @@
+#include "debug.h"
+#include "logger.h"
 #include "unity.h"
 #include "vector.h"
 
@@ -26,7 +28,9 @@ void count_multiples_of_10_to_100(void);
 void filter_multiples_of_10_and_sum(void);
 void divide_all_even_numbers_by_2_under_100(void);
 void add_one_to_odds_and_set_all_evens_to_active(void);
+
 void do_filter_multipies_of_10_and_sum_with_any_type(void);
+void push_pop_clear_256_with_any_type(void);
 
 int main(void) {
   UNITY_BEGIN();
@@ -40,6 +44,7 @@ int main(void) {
   RUN_TEST(divide_all_even_numbers_by_2_under_100);
   RUN_TEST(add_one_to_odds_and_set_all_evens_to_active);
   RUN_TEST(do_filter_multipies_of_10_and_sum_with_any_type);
+  RUN_TEST(push_pop_clear_256_with_any_type);
 
   UNITY_END();
 }
@@ -186,4 +191,27 @@ void do_filter_multipies_of_10_and_sum_with_any_type(void) {
   TEST_ASSERT(sum.x == 450);
 
   any_vec_free(&container);
+}
+
+void push_pop_clear_256_with_any_type(void) {
+  any_vec_t container;
+  vec_unknown_type_init(&container, sizeof(cs));
+
+  for (int i = 0; i < 256; i++) {
+    any_vec_push(&container,
+                 of_any((&(cs){.x = i, .y = i, .z = i, .active = false})));
+    TEST_ASSERT(((cs *)any_vec_top(&container))->x == i);
+    TEST_ASSERT(cs_vec_top((cs_vec_t *)&container)->x == i);
+  }
+
+  for (int i = 255; i >= 0; i--) {
+    TEST_ASSERT(cs_vec_top((cs_vec_t *)&container)->x == i);
+    any_vec_pop(&container);
+  }
+
+  TEST_ASSERT(container.length == 0);
+  any_vec_push(&container, of_any((&(cs){.y = 99})));
+  any_vec_clear(&container);
+  any_vec_push(&container, of_any((&(cs){.y = 999})));
+  TEST_ASSERT(cs_vec_top((cs_vec_t *)&container)->y == 999);
 }

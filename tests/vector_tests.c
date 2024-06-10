@@ -184,4 +184,6 @@ void do_filter_multipies_of_10_and_sum_with_any_type(void) {
                         adder, (cs){.x = 0});
 
   TEST_ASSERT(sum.x == 450);
+
+  any_vec_free(&container);
 }

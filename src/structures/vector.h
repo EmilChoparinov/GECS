@@ -21,6 +21,8 @@
 
 #define vector_t(T) T##_vec_t
 
+typedef void *any;
+
 #define VECTOR_GEN_H(T)                                                        \
   /*-------------------------------------------------------                    \
    * Define Datastructures                                                     \
@@ -29,6 +31,7 @@
                                                                                \
   struct vector_t(T) {                                                         \
     int64_t length, __top, __size;                                             \
+    int64_t __el_size;                                                         \
     T      *element_head;                                                      \
   };                                                                           \
                                                                                \
@@ -46,6 +49,7 @@
   fdecl(retcode, T, vec_free, (vector_t(T) * v));                              \
   fdecl(vector_t(T) *, T, vec_heap_init, (void));                              \
   fdecl(void, T, vec_heap_free, (vector_t(T) * v));                            \
+                                                                               \
   fdecl(retcode, T, vec_resize, (vector_t(T) * v, int64_t size));              \
   fdecl(retcode, T, vec_copy, (vector_t(T) * dest, vector_t(T) * src));        \
   fdecl(retcode, T, vec_clear, (vector_t(T) * v));                             \
@@ -71,12 +75,19 @@
 #define VECTOR_GEN_C(T)                                                        \
   static void fname(T, assert_init_checks)(vector_t(T) * v);                   \
   static void fname(T, bound_assert_checks)(vector_t(T) * v, int64_t i);       \
+  static ret(vector_t(T) *) fname(T, vec_construct)(vector_t(T) * v);          \
                                                                                \
-  ret(vector_t(T) *) fname(T, vec_init)(vector_t(T) * v) {                     \
+  ret(vector_t(T) *) fname(T, vec_construct)(vector_t(T) * v) {                \
     v->length = 0;                                                             \
     v->__size = 1;                                                             \
     v->__top = 0;                                                              \
-    v->element_head = calloc(v->__size, sizeof(T));                            \
+    return v;                                                                  \
+  }                                                                            \
+                                                                               \
+  ret(vector_t(T) *) fname(T, vec_init)(vector_t(T) * v) {                     \
+    fname(T, vec_construct)(v);                                                \
+    v->__el_size = sizeof(T);                                                  \
+    v->element_head = calloc(v->__size, v->__el_size);                         \
     assert(v->element_head);                                                   \
     return v;                                                                  \
   }                                                                            \
@@ -108,9 +119,9 @@
     if (size < v->__size) return R_OKAY;                                       \
     int64_t old_size = v->__size;                                              \
     while (size >= v->__size) v->__size *= 2;                                  \
-    void *new_addr = calloc(v->__size * sizeof(T), 1);                         \
+    void *new_addr = calloc(v->__size * v->__el_size, 1);                      \
     assert(new_addr);                                                          \
-    memcpy(new_addr, v->element_head, old_size * sizeof(T));                   \
+    memcpy(new_addr, v->element_head, old_size * v->__el_size);                \
     free(v->element_head);                                                     \
     v->element_head = new_addr;                                                \
     return R_OKAY;                                                             \
@@ -125,8 +136,8 @@
     fname(T, bound_assert_checks)(v, i);                                       \
     assert(element);                                                           \
                                                                                \
-    memmove((char *)v->element_head + i * sizeof(T), element, sizeof(T));      \
-    /*v->element_head[i] = *element;*/                                         \
+    memmove((char *)v->element_head + i * v->__el_size, element,               \
+            v->__el_size);                                                     \
     return R_OKAY;                                                             \
   }                                                                            \
                                                                                \
@@ -135,7 +146,8 @@
     assert(element);                                                           \
                                                                                \
     for (int64_t i = 0; i < v->length; i++)                                    \
-      if (memcmp(element, &v->element_head[i], sizeof(T)) == 0) return true;   \
+      if (memcmp(element, &v->element_head[i], v->__el_size) == 0)             \
+        return true;                                                           \
     return false;                                                              \
   }                                                                            \
                                                                                \
@@ -144,7 +156,7 @@
     assert(element);                                                           \
     bool ret = fname(T, vec_resize)(v, v->length) == R_OKAY;                   \
     assert(ret);                                                               \
-    memmove(&v->element_head[v->__top], element, sizeof(T));                   \
+    memmove(&v->element_head[v->__top], element, v->__el_size);                \
     v->__top++;                                                                \
     if (v->__top >= v->length) v->length = v->__top;                           \
     return ret;                                                                \
@@ -172,8 +184,9 @@
     if (dest->length == 0) return R_OKAY;                                      \
                                                                                \
     /* Copy array into new dest*/                                              \
-    dest->element_head = malloc(src->__size * sizeof(T));                      \
-    memmove(dest->element_head, src->element_head, src->__size * sizeof(T));   \
+    dest->element_head = malloc(src->__size * src->__el_size);                 \
+    memmove(dest->element_head, src->element_head,                             \
+            src->__size * src->__el_size);                                     \
     return R_OKAY;                                                             \
   }                                                                            \
                                                                                \
@@ -236,5 +249,23 @@
     fname(T, assert_init_checks)(v);                                           \
     assert(i >= 0 && i < v->length);                                           \
   }
+
+VECTOR_GEN_H(any);
+VECTOR_GEN_C(any);
+
+any_vec_t *vec_unknown_type_init(any_vec_t *v, size_t el_size) {
+  any_vec_construct(v);
+  v->__el_size = el_size;
+  v->element_head = calloc(v->__size, v->__el_size);
+  assert(v->element_head);
+  return v;
+}
+
+any_vec_t *vec_unknown_type_heap_init(size_t el_size) {
+  any_vec_t *v = malloc(sizeof(*v));
+  assert(v);
+  vec_unknown_type_init(v, el_size);
+  return v;
+}
 
 #endif

@@ -26,6 +26,7 @@ void count_multiples_of_10_to_100(void);
 void filter_multiples_of_10_and_sum(void);
 void divide_all_even_numbers_by_2_under_100(void);
 void add_one_to_odds_and_set_all_evens_to_active(void);
+void do_filter_multipies_of_10_and_sum_with_any_type(void);
 
 int main(void) {
   UNITY_BEGIN();
@@ -38,6 +39,7 @@ int main(void) {
   RUN_TEST(filter_multiples_of_10_and_sum);
   RUN_TEST(divide_all_even_numbers_by_2_under_100);
   RUN_TEST(add_one_to_odds_and_set_all_evens_to_active);
+  RUN_TEST(do_filter_multipies_of_10_and_sum_with_any_type);
 
   UNITY_END();
 }
@@ -165,4 +167,21 @@ void add_one_to_odds_and_set_all_evens_to_active(void) {
 
   TEST_ASSERT(all_active.length == vector.length);
   cs_vec_free(&all_active);
+}
+
+void do_filter_multipies_of_10_and_sum_with_any_type(void) {
+  any_vec_t container;
+  vec_unknown_type_init(&container, sizeof(cs));
+
+  for (int i = 0; i < 100; i++) {
+    any_vec_push(&container,
+                 (void *)&(cs){.x = i, .y = i, .z = i, .active = false});
+  }
+
+  // We cannot fold because the the initial value will be void type. We need to
+  // cast and use the correct type to fold!
+  cs sum = cs_vec_foldl(cs_vec_filter((cs_vec_t *)&container, is_mult_10),
+                        adder, (cs){.x = 0});
+
+  TEST_ASSERT(sum.x == 450);
 }

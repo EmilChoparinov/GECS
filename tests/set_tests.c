@@ -1,3 +1,4 @@
+#include "debug.h"
 #include "logger.h"
 #include "set.h"
 #include "unity.h"

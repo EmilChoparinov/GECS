@@ -1,186 +1,120 @@
-/*==============================================================================
-Associated Files:
-    arena.c arena.h
-Purpose:
-    Arena alloc structure implementation. Uses a region-based linked-list to
-    implement a lifetime collection of heap objects.
-==============================================================================*/
 #include "arena.h"
 
-/* In order to do proper memory leak debugging with valgrind, we must disable
- * the arena code. Set the DISABLE_ARENA_ALLOC flag to true to convert this
- * file into a wrapper for malloc. */
-#ifndef DISABLE_ARENA_ALLOC
+#define ON_MALLOC_FAIL                                                         \
+  log_error("Malloc failed, exiting.");                                        \
+  exit(EXIT_FAILURE);
 
 /*-------------------------------------------------------
- * Declarations
- *-------------------------------------------------------*/
-typedef struct region region;
+ * DATA STRUCTURES
+ *-------------------------------------------------------
+ * The arena datastructure is essentially a linked list
+ * that starts at *first and ends at *last.
+ */
 
-struct arena {
-  /* Pointers to the beginning and ending of the linked-list of regions. */
-  region *begin, *end;
-  /* The count of regions in this arena. */
-  size_t region_cnt;
+typedef struct region_t region_t;
+
+struct region_t {
+  size_t    alloc_curs;  /* Relative curs pointing to next available address. */
+  size_t    region_size; /* How much memory is allocated in this region. */
+  void     *memory;
+  region_t *next;
 };
 
-/* A region is always continous in memory. */
-struct region {
-  /* Last item that was allocated. */
-  size_t alloc_pos;
-  /* Base pointer to memory in heap. */
-  void *base_memory;
-  /* Next region. */
-  region *next;
+struct arena_t {
+  region_t *last; /* Points to the last chunk allocated for O(1) access */
+  region_t  first;
 };
 
-/**
- * @brief Create a new region in the arena.
- * @return region* to new region.
- */
-static region *new_region(void);
-
-/**
- * @brief Ensure that there is sufficient space reserved in the arena. Does
- * nothing if `size` fits in existing region.
- * @param a    the arena.
- * @param size the size.
- */
-static void reserve(arena *a, size_t size);
-
-/**
- * @brief Destroy a region and its subsequent regions. Use mainly to free.
- * @param r The region to free.
- */
-static void region_destroy(region *r);
+/*-------------------------------------------------------
+ * REGION DECLARATIONS
+ *-------------------------------------------------------*/
+static void region_init(region_t *reg, size_t bytes);
+static void region_free(region_t *reg);
 
 /*-------------------------------------------------------
- * IMPLEMENTATION
+ * CONTAINER OPERATIONS
  *-------------------------------------------------------*/
-arena *arena_make(void) {
-  arena  *a;
-  region *r;
+arena_t *arena_init(void) {
+  arena_t *ar;
 
-  a = malloc(sizeof(arena));
-  assert(a);
-  r = new_region();
+  /* Since we allocate with arena_t the first region, we point to the internal
+     address in the struct to initialize last. */
+  ar = malloc(sizeof(*ar));
+  if (!ar) ON_MALLOC_FAIL;
+  ar->last = &ar->first;
 
-  /* Initialize arena fields. */
-  a->begin = r;
-  a->end = r;
-  a->region_cnt = 1;
+  region_init(ar->last, 0);
 
-  return a;
+  return ar;
 }
 
-void arena_destroy(arena *a) {
-  assert(a);
-  region_destroy(a->begin);
-  free(a);
-}
+void arena_free(arena_t *ar) {
+  assert(ar);
+  region_t *current = ar->first.next;
 
-void *arena_alloc(arena *a, size_t size) {
-  assert(a);
-  assert(a->begin);
-  assert(a->end);
-  assert(size <= REGION_SIZE);
+  region_t *swap;
+  while (current) {
+    swap = current;
+    current = current->next;
 
-  /* Memory pointer to the start of the allocation in the arena. */
-  void *ret;
-
-  /* Since we assert size <= REGION_STATE. reserve guarentees we will have
-  space for the proper location. */
-  reserve(a, size);
-  ret = a->end->base_memory + a->end->alloc_pos;
-  a->end->alloc_pos += size;
-  return ret;
-}
-
-int arena_poll(arena *a) {
-  assert(a);
-  return REGION_SIZE - a->end->alloc_pos;
-}
-
-void arena_refresh(arena *a) {
-  assert(a);
-  assert(a->begin);
-  assert(a->end);
-
-  region *r = new_region();
-  a->end->next = r;
-  a->end = r;
-}
-
-/*-------------------------------------------------------
- * STATIC FUNCTIONS
- *-------------------------------------------------------*/
-static region *new_region(void) {
-  region *r = malloc(sizeof(region));
-  void   *r_mem = malloc(REGION_SIZE);
-  assert(r);
-  assert(r_mem);
-
-  /* Initialize new region fields. */
-  r->alloc_pos = 0;
-  r->base_memory = r_mem;
-  r->next = NULL;
-
-  return r;
-}
-
-static void region_destroy(region *r) {
-  if (r == NULL) return;
-  region_destroy(r->next);
-  free(r->base_memory);
-  free(r);
-}
-
-static void reserve(arena *a, size_t size) {
-  /* To preserve speed, we alloc a new region without checking previous
-     regions if they have the required space for the incoming object. We do
-     this instead of linear checking or using a table for the following
-     reasons:
-          - We assume that when a user of the library calls `alloc`, that
-            these objects will be accessed close to each other in the code. If
-            we assume this, it would make no sense to fragment the access to
-            preserve space.
-          - Even though this approach leads to fragmentation, we are forbidden
-            using the realloc call because all previously given pointers to
-            the user will be invalid. */
-  size_t next_alloc_pos = a->end->alloc_pos + size;
-  if (next_alloc_pos > REGION_SIZE) {
-    region *r = new_region();
-    a->end->next = r;
-    a->end = r;
+    region_free(swap);
+    free(swap);
   }
-}
-#else
-/* The following removes the arena to allow for easy debugging with external
-tooling. */
-struct arena {
-  /* We preserve the arena's API by keeping track of the mallocs and then
-   *  freeing them all at once. This vector contains addresses returned by
-   *  malloc. */
-  short_vec_t *mallocs;
-};
 
-arena *arena_make(void) {
-  arena *a;
-  if ((a = malloc(sizeof(*a))) == NULL) return NULL;
-  if ((a->mallocs = short_vec_default(sizeof(void *))) == NULL) return NULL;
-  return a;
+  free(ar->first.memory);
+  free(ar);
 }
-void arena_destroy(arena *arena) {
-  short_vec_free(arena->mallocs);
-  free(arena);
-}
-void *arena_alloc(arena *arena, size_t bytes) {
-  void *reserved_mem;
-  if ((reserved_mem = malloc(bytes)) == NULL) return NULL;
-  short_vec_push(arena->mallocs, reserved_mem);
-  return reserved_mem;
-}
-int  arena_poll(arena *arena) { return ARENA_OK; }
-void arena_refresh(arena *a) { return ARENA_OK; }
 
-#endif
+/*-------------------------------------------------------
+ * ELEMENT OPERATIONS
+ *-------------------------------------------------------*/
+void *arena_alloc(arena_t *ar, size_t bytes) {
+  assert(ar);
+  assert(ar->last->next == NULL && "Structure corrupted");
+
+  /* If we have no more space, we push a new region. */
+  if (bytes > arena_poll(ar)) arena_push_region(ar, bytes);
+
+  void *loc; /* The start address of available memory in this chunk */
+
+  loc = ar->last->memory + ar->last->alloc_curs;
+  ar->last->alloc_curs += bytes;
+  return loc;
+}
+
+void *arena_realloc(arena_t *ar, void *ptr, size_t bytes) {
+  assert(ar);
+  assert(ar->last->next == NULL && "Structure corrupted");
+  return NULL;
+}
+
+void arena_push_region(arena_t *ar, size_t chunk_size) {
+  assert(ar);
+  assert(ar->last->next == NULL && "Structure corrupted");
+
+  ar->last->next = malloc(sizeof(*ar->last->next));
+  if (!ar->last->next) ON_MALLOC_FAIL;
+  region_init(ar->last->next, chunk_size);
+  ar->last = ar->last->next;
+}
+
+size_t arena_poll(arena_t *ar) {
+  return ar->last->region_size - ar->last->alloc_curs;
+}
+
+/*-------------------------------------------------------
+ * REGION OPERATIONS
+ *-------------------------------------------------------*/
+static void region_init(region_t *reg, size_t bytes) {
+  assert(reg);
+  size_t to_reserve = bytes;
+  if (to_reserve < REGION_SIZE) to_reserve = REGION_SIZE;
+
+  reg->memory = malloc(to_reserve);
+  if (!reg->memory) ON_MALLOC_FAIL;
+  reg->alloc_curs = 0;
+  reg->region_size = to_reserve;
+  reg->next = NULL;
+}
+
+static void region_free(region_t *reg) { free(reg->memory); }

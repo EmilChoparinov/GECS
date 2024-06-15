@@ -62,7 +62,7 @@ TST_BINS_DIR = tests/bin
 #	LDFLAGS:
 #	  - 
 #------------------------------------------------------------------------------#
-CC = gcc
+CC = clang
 EXT = .c
 EXT_HDR = .h
 EXT_ARCHIVE = .a
@@ -105,7 +105,7 @@ HDR_FILES = $(shell find $(SRC_DIR) -name "*$(EXT_HDR)")
 LIB_FILES = $(wildcard $(LIBS_DIR)/*.c)
 TST_FILES = $(wildcard $(TST_DIR)/*.c)
 OBJ_FILES = $(SRC_FILES:$(SRC_DIR)/%$(EXT)=$(OBJ_DIR)/%.o) $(LIB_FILES:$(LIBS_DIR)/%$(EXT)=$(OBJ_DIR)/libs/%.o)
-TST_BINS=$(patsubst $(TST_DIR)/%.c, $(TST_BINS_DIR)/%, $(TST_FILES))
+TST_BINS  = $(patsubst $(TST_DIR)/%.c, $(TST_BINS_DIR)/%, $(TST_FILES))
 
 #------------------------------------------------------------------------------#
 # EXTERNAL MAKEFILES					 												   #

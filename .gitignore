@@ -1,8 +1,10 @@
 ### Project Specific ###
 tests/bin/**
 run_demo
+demo/gecs/**
 libgecs.a
 libgecs.zip
+extra/**
 
 ### C ###
 # Prerequisites

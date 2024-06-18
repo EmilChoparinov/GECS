@@ -19,7 +19,8 @@
 #include <stdio.h>
 
 #include "funcdef.h"
-#include "gecs_codes.h"
+#include "retcodes.h"
+
 
 #include "vector.h" /* This implementation relies on the vector structure so 
                        file is **NOT** standalone. */

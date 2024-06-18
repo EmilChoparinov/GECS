@@ -15,7 +15,7 @@
 #include <stdint.h>
 
 #include "funcdef.h"
-#include "gecs_codes.h"
+#include "retcodes.h"
 #include "map.h" /* This implementation relies on the map structure so 
                     file is **NOT** standalone. */
 

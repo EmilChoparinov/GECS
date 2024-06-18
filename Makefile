@@ -166,12 +166,16 @@ $(TST_BINS_DIR):
 # MAKE MEMTST					 										   	   #
 #------------------------------------------------------------------------------#
 memtst:
-	docker start gecs-container >/dev/null
-	docker exec -it gecs-container sh -c 'make memtst_containerized'
+	@docker run --rm -it \
+		-v ".:/virtual" \
+		--name gecs-container \
+		gecs-image \
+		/bin/bash -c 'make memtst_containerized clean'
 
 memtst_containerized: $(BUILD_FILE_NAME) $(TST_DIR) $(TST_BINS_DIR) $(TST_BINS)
 	@echo Running Valgrind with Tests...
 	@for test in $(TST_BINS) ; do valgrind 									   \
+		 --show-leak-kinds=all										   	       \
 		 --leak-check=full 													   \
 		 --track-origins=yes 												   \
 		 ./$$test --verbose 											       \
@@ -205,8 +209,6 @@ env:
 	@echo "Building image..."
 	@docker build -t gecs-image .
 	@echo "Done!"
-	@echo "Running container for the first time..."
-	@docker run -it -v ".:/virtual" --name gecs-container gecs-image
 
 #------------------------------------------------------------------------------#
 # MAKE CLEAN																   #

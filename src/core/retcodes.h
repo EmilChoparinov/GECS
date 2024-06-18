@@ -1,6 +1,6 @@
 /* =========================================================================
     Author: E.D Choparinov, Amsterdam
-    Related Files: gecs_codes.h
+    Related Files: retcodes.h
     Created On: May 28 2024
     Purpose:
         The purpose of this file is to provide definitions for all status codes

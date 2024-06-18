@@ -13,7 +13,7 @@
 /*-------------------------------------------------------
  * GECS Core
  *-------------------------------------------------------*/
-#include "gecs_codes.h"    /* Contains return code information. */
+#include "retcodes.h" /* Contains return code information. */
 #include "gecs_register.h" /* Registers container types. */
 
 /*-------------------------------------------------------

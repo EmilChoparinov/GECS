@@ -214,4 +214,6 @@ void push_pop_clear_256_with_any_type(void) {
   any_vec_clear(&container);
   any_vec_push(&container, of_any((&(cs){.y = 999})));
   TEST_ASSERT(cs_vec_top((cs_vec_t *)&container)->y == 999);
+
+  any_vec_free(&container);
 }

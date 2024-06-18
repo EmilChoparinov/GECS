@@ -17,7 +17,7 @@
 #include <string.h>
 
 #include "funcdef.h"
-#include "gecs_codes.h"
+#include "retcodes.h"
 
 #define vector_t(T) T##_vec_t
 
@@ -259,6 +259,12 @@ typedef void *any;
 
 VECTOR_GEN_H(any);
 VECTOR_GEN_C(any);
+
+/* This is a workaround to get a more intuitive API for users. */
+typedef retcode (*__vec_unknown_f_free)(any_vec_t *v);
+typedef void (*__vec_unknown_f_hfree)(any_vec_t *v);
+__vec_unknown_f_free  vec_unknown_type_free = any_vec_free;
+__vec_unknown_f_hfree vec_unknown_type_heap_free = any_vec_heap_free;
 
 any_vec_t *vec_unknown_type_init(any_vec_t *v, size_t el_size) {
   any_vec_construct(v);

@@ -1,15 +1,19 @@
-#include "gecs_register.h"
+#include "register.h"
 
 /*-------------------------------------------------------
  * Vector Types
  *-------------------------------------------------------*/
 VECTOR_GEN_C(bool);
+VECTOR_GEN_C(gid);
 
 #include "map.h"
 
 /*-------------------------------------------------------
  * Map Types
  *-------------------------------------------------------*/
+MAP_GEN_C(gstr, gsize);
+MAP_GEN_C(gid, gid);
+MAP_GEN_C(gstr, gint);
 
 #include "set.h"
 

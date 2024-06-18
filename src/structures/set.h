@@ -15,9 +15,9 @@
 #include <stdint.h>
 
 #include "funcdef.h"
-#include "retcodes.h"
 #include "map.h" /* This implementation relies on the map structure so 
                     file is **NOT** standalone. */
+#include "retcodes.h"
 
 #define set_t(T)      T##_set_t
 #define set_access(T) wrap_set_##T##_char_map_t

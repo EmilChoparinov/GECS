@@ -21,7 +21,6 @@
 #include "funcdef.h"
 #include "retcodes.h"
 
-
 #include "vector.h" /* This implementation relies on the vector structure so 
                        file is **NOT** standalone. */
 
@@ -44,12 +43,18 @@ VECTOR_GEN_C(m_bool);
 #define map_vec_t(Ta, Tb)        Ta##_##Tb##_map_item_vec_t
 #define map_access(Ta, Tb, func) Ta##_##Tb##_map_item_vec_##func
 
+/* Used to zero out map. */
+m_bool m_bool_set_to_true(m_bool b) { return true; }
+
+#define MAP_GEN_FORWARD(Ta, Tb)                                                \
+  /*-------------------------------------------------------                    \
+   * Define Datastructures                                                     \
+   *-------------------------------------------------------*/                  \
+  typedef struct map_t(Ta, Tb) map_t(Ta, Tb);                                  \
+  typedef struct map_item_t(Ta, Tb) map_item_t(Ta, Tb);
+
 #define MAP_GEN_H(Ta, Tb)                                                        \
-  /*-------------------------------------------------------                      \
-   * Define Datastructures                                                       \
-   *-------------------------------------------------------*/                    \
-  typedef struct map_t(Ta, Tb) map_t(Ta, Tb);                                    \
-  typedef struct map_item_t(Ta, Tb) map_item_t(Ta, Tb);                          \
+  MAP_GEN_FORWARD(Ta, Tb)                                                        \
                                                                                  \
   struct map_item_t(Ta, Tb) {                                                    \
     Ta key;                                                                      \
@@ -103,7 +108,6 @@ VECTOR_GEN_C(m_bool);
   static ret(void) ffname(Ta, Tb, map_assert_init)(map_t(Ta, Tb) * m);         \
   static ret(void) ffname(Ta, Tb, map_lf_property)(map_t(Ta, Tb) * m);         \
                                                                                \
-  m_bool m_bool_set_to_true(m_bool b) { return true; }                         \
   /*-------------------------------------------------------                    \
    * Container Operations                                                      \
    *-------------------------------------------------------*/                  \

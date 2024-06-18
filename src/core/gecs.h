@@ -10,16 +10,44 @@
 #ifndef __HEADER_GECS_H__
 #define __HEADER_GECS_H__
 
+#include <stdarg.h>
+#include <str_utils.h>
+
 /*-------------------------------------------------------
  * GECS Core
  *-------------------------------------------------------*/
+#include "register.h" /* Registers GECS types. */
 #include "retcodes.h" /* Contains return code information. */
-#include "gecs_register.h" /* Registers container types. */
 
 /*-------------------------------------------------------
  * Utilities
  *-------------------------------------------------------*/
 #include "debug.h"  /* Adds GECS debugging features. */
-#include "logger.h" /* Adds Logging */
+#include "logger.h" /* Adds Logging. */
+
+
+/*-------------------------------------------------------
+ * Core Functions
+ *-------------------------------------------------------*/
+g_core_t *g_create_world(void);
+retcode   g_destroy_world(g_core_t *w);
+retcode   g_progress(g_core_t *w);
+
+#define G_COMPONENT(w, ty)                                                     \
+  char *__name = fix_str_256(#ty);                                             \
+  g_register_component(w, __name, sizeof(ty));                                 \
+  free(__name);
+
+#define G_TAG(w, ty)                                                           \
+  char *__name = fix_str_256(#ty);                                             \
+  g_register_component(w, __name, 0);                                          \
+  free(__name);
+
+#define G_SYSTEM(world, sys, ...) g_register_system(world, sys, #__VA_ARGS__);
+
+gid g_create_entity(g_core_t *w);
+
+retcode g_register_component(g_core_t *w, gstr name, size_t component_size);
+retcode g_register_system(g_core_t *w, g_system *sys, char *query);
 
 #endif

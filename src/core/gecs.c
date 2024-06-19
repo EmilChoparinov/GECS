@@ -17,16 +17,24 @@ typedef archetype       *parchetype;
 struct archetype {
   gid archetype_id; /* Unique Identifier for this archetype. */
 
-  any_vec_t       components; /* Contiguous vector of interleaved compents */
-  gid_gsize_map_t offsets;    /* Map: hash(name) -> interleaved comp offset */
+  any_vec_t       composite; /* Contiguous vector of interleaved compents */
+  gid_gsize_map_t offsets;   /* Map: hash(name) -> interleaved comp offset */
 
   psystem_data_vec_t contenders; /* Vec: system_data* */
+
+  ledger cache; /* In concurrency contexts, mutations are stored here. */
 };
 MAP_GEN_H(gid, archetype);
 MAP_GEN_C(gid, archetype);
 
-MAP_GEN_H(gid, parchetype);
-MAP_GEN_C(gid, parchetype);
+typedef struct entity_record entity_record;
+struct entity_record {
+  archetype *a;     /* The archetype this entity belongs to. */
+  gint       index; /* The index to collect their components. */
+};
+
+MAP_GEN_H(gid, entity_record);
+MAP_GEN_C(gid, entity_record);
 
 struct g_core_t {
   gid    id_gen;        /* Counts up, makes unique IDs. */
@@ -35,9 +43,9 @@ struct g_core_t {
 
   /* These are all gid maps because the hashing function outputs the same size
      as gid, so it's convenient. */
-  gid_gsize_map_t      component_registry; /* Map: hash(name) -> comp size */
-  gid_parchetype_map_t entity_registry;    /* Map: entity id -> archetype* */
-  gid_archetype_map_t  archetype_registry; /* Map: hash([name]) -> archetype */
+  gid_gsize_map_t     component_registry;  /* Map: hash(name) -> comp size */
+  gid_archetype_map_t archetype_registry;  /* Map: hash([name]) -> archetype */
+  gid_entity_record_map_t entity_registry; /* Map: entt id -> entt record */
 
   system_data_vec_t system_registry; /* Vec: system_data. */
 };
@@ -61,7 +69,7 @@ g_core_t *g_create_world(void) {
   w->reprocess_fsm = 1;
 
   gid_gsize_map_init(&w->component_registry);
-  gid_parchetype_map_init(&w->entity_registry);
+  gid_entity_record_map_init(&w->entity_registry);
   gid_archetype_map_init(&w->archetype_registry);
 
   system_data_vec_init(&w->system_registry);
@@ -76,14 +84,14 @@ g_core_t *g_create_world(void) {
 
 static bool f_free_archetype(gid_archetype_map_item *it) {
   archetype a = it->value;
-  vec_unknown_type_free(&a.components);
+  vec_unknown_type_free(&a.composite);
   psystem_data_vec_free(&a.contenders);
   gid_gsize_map_free(&a.offsets);
   return true;
 }
 retcode g_destroy_world(g_core_t *w) {
   gid_gsize_map_free(&w->component_registry);
-  gid_parchetype_map_free(&w->entity_registry);
+  gid_entity_record_map_free(&w->entity_registry);
   gid_archetype_map_foreach(&w->archetype_registry, f_free_archetype);
 
   system_data_vec_free(&w->system_registry);
@@ -97,14 +105,32 @@ gid g_create_entity(g_core_t *w) {
   gid id = w->id_gen++;
 
   /* All entities start initially at the empty archetype */
-  gid_parchetype_map_put(&w->entity_registry, &id, &empty_archetype);
+  gid_entity_record_map_put(
+      &w->entity_registry, &id,
+      &(entity_record){.a = &empty_archetype, .index = 0});
 
   return id;
 }
 
 retcode g_register_component(g_core_t *w, char *name, size_t component_size) {
   gid hash_name = (gid)hash_bytes(name, strlen(name));
-  return gid_gsize_map_put(&w->component_registry, &hash_name, component_size);
+  return gid_gsize_map_put(&w->component_registry, &hash_name, &component_size);
+}
+
+retcode g_register_system(g_core_t *w, g_system *sys, char *query) {
+  assert(query);
+  assert(sys);
+
+  /* Copy so string stays safe. */
+  size_t query_len = strlen(query);
+  char  *s = malloc(query_len + 1);
+  assert(s);
+  memmove(s, query, query_len);
+  s[query_len + 1] = '\0';
+
+  return system_data_vec_push(
+      &w->system_registry,
+      &(system_data){.requirements = s, .run_system = sys});
 }
 
 /* Static Function Implementations */
@@ -145,7 +171,7 @@ static gid _g_archetype_key(char *component_query) {
   assert(regexec(&matcher, component_query, GECS_MAX_ARCHETYPE_COMPOSITION,
                  groups, 0) != 0);
 
-  for (i = 1; i < str_len; i++) {
+  for (i = 1; i < archetype_len; i++) {
     /* groups[0] contains the full matched string, not groups. */
     regoff_t arg_start = groups[i].rm_so;
     regoff_t arg_end = groups[i].rm_eo;

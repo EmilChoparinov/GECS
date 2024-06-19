@@ -11,6 +11,7 @@
 #define __HEADER_REGISTER_H__
 
 #include <stdint.h>
+#include <stdlib.h>
 
 /*-------------------------------------------------------
  * GECS Types
@@ -26,9 +27,8 @@ typedef int64_t gid;
    need help. */
 typedef char gstr[256];
 
-/* Type representing the amount of bytes in memory some object is. Same reason
-   as gid as to why its int64_t. */
-typedef int64_t gsize;
+/* Type representing the amount of bytes in memory some object is. */
+typedef size_t gsize;
 
 typedef int64_t gint;
 

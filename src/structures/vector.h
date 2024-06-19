@@ -72,6 +72,7 @@ typedef void *any;
    *-------------------------------------------------------*/                  \
   fdecl(int64_t, T, vec_count_if, (vector_t(T) * v, pred_f(T) f_pred));        \
   fdecl(vector_t(T) *, T, vec_filter, (vector_t(T) * v, pred_f(T) f_pred));    \
+  fdecl(void, T, vec_foreach, (vector_t(T) * v, pred_f(T) f_pred));            \
   fdecl(vector_t(T) *, T, vec_map, (vector_t(T) * v, unary_f(T) f_unary));     \
   fdecl(T, T, vec_foldl, (vector_t(T) * v, binary_f(T) f_binary, T start));
 
@@ -225,6 +226,11 @@ typedef void *any;
     return v;                                                                  \
   }                                                                            \
                                                                                \
+  ret(void) fname(T, vec_foreach)(vector_t(T) * v, pred_f(T) f_pred) {         \
+    fname(T, assert_init_checks)(v);                                           \
+    for (int64_t i = 0; i < v->length; i++) f_pred(&v->element_head[i]);       \
+  }                                                                            \
+                                                                               \
   ret(vector_t(T) *) fname(T, vec_map)(vector_t(T) * v, unary_f(T) f_unary) {  \
     fname(T, assert_init_checks)(v);                                           \
                                                                                \
@@ -258,27 +264,11 @@ typedef void *any;
   }
 
 VECTOR_GEN_H(any);
-VECTOR_GEN_C(any);
 
-/* This is a workaround to get a more intuitive API for users. */
-typedef retcode (*__vec_unknown_f_free)(any_vec_t *v);
-typedef void (*__vec_unknown_f_hfree)(any_vec_t *v);
-__vec_unknown_f_free  vec_unknown_type_free = any_vec_free;
-__vec_unknown_f_hfree vec_unknown_type_heap_free = any_vec_heap_free;
+#define vec_unknown_type_free      any_vec_free
+#define vec_unknown_type_heap_free any_vec_heap_free
 
-any_vec_t *vec_unknown_type_init(any_vec_t *v, size_t el_size) {
-  any_vec_construct(v);
-  v->__el_size = el_size;
-  v->element_head = calloc(v->__size, v->__el_size);
-  assert(v->element_head);
-  return v;
-}
-
-any_vec_t *vec_unknown_type_heap_init(size_t el_size) {
-  any_vec_t *v = malloc(sizeof(*v));
-  assert(v);
-  vec_unknown_type_init(v, el_size);
-  return v;
-}
+any_vec_t *vec_unknown_type_init(any_vec_t *v, size_t el_size);
+any_vec_t *vec_unknown_type_heap_init(size_t el_size);
 
 #endif

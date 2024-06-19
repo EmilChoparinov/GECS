@@ -1,4 +1,3 @@
-// #include "map.h"
 #include "logger.h"
 #include "map.h"
 #include "unity.h"
@@ -33,6 +32,8 @@ void test_has(void);
 void test_remove(void);
 void test_push_loadfactor(void);
 void test_duplicate_handling(void);
+void test_foreach(void);
+void test_count_if(void);
 
 int main(void) {
   UNITY_BEGIN();
@@ -42,6 +43,8 @@ int main(void) {
   RUN_TEST(test_remove);
   RUN_TEST(test_push_loadfactor);
   RUN_TEST(test_duplicate_handling);
+  RUN_TEST(test_foreach);
+  RUN_TEST(test_count_if);
 
   UNITY_END();
 }
@@ -128,4 +131,28 @@ void test_duplicate_handling(void) {
                 R_FAIL);
     TEST_ASSERT(tmap.slots_in_use == 0);
   }
+}
+
+bool is_active(id_cs_map_item *it) {
+  TEST_ASSERT(it->value.active);
+  return it->value.active;
+}
+void test_foreach(void) {
+  for (int i = 0; i < 500; i++) {
+    TEST_ASSERT(id_cs_map_put(&tmap, &(id){.is_active = true, .uid = i},
+                              &(cs){.x = 1, .y = 2, .z = 3, .active = true}) ==
+                R_OKAY);
+  }
+
+  id_cs_map_foreach(&tmap, is_active);
+}
+
+void test_count_if(void) {
+  for (int i = 0; i < 500; i++) {
+    TEST_ASSERT(id_cs_map_put(&tmap, &(id){.is_active = true, .uid = i},
+                              &(cs){.x = 1, .y = 2, .z = 3, .active = true}) ==
+                R_OKAY);
+  }
+
+  TEST_ASSERT(id_cs_map_count_if(&tmap, is_active) == 500);
 }

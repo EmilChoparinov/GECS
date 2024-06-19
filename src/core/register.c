@@ -11,8 +11,8 @@ VECTOR_GEN_C(gid);
 /*-------------------------------------------------------
  * Map Types
  *-------------------------------------------------------*/
-MAP_GEN_C(gstr, gsize);
 MAP_GEN_C(gid, gid);
+MAP_GEN_C(gid, gsize);
 MAP_GEN_C(gstr, gint);
 
 #include "set.h"

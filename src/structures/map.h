@@ -29,7 +29,6 @@
    instead. */
 typedef bool m_bool;
 VECTOR_GEN_H(m_bool);
-VECTOR_GEN_C(m_bool);
 
 #define MAP_DEFAULT_SIZE 16
 #define MAP_LOAD_FACTOR  0.75f
@@ -44,8 +43,7 @@ VECTOR_GEN_C(m_bool);
 #define map_access(Ta, Tb, func) Ta##_##Tb##_map_item_vec_##func
 
 /* Used to zero out map. */
-m_bool m_bool_set_to_true(m_bool b) { return true; }
-
+m_bool m_bool_set_to_true(m_bool b);
 #define MAP_GEN_FORWARD(Ta, Tb)                                                \
   /*-------------------------------------------------------                    \
    * Define Datastructures                                                     \
@@ -97,6 +95,8 @@ m_bool m_bool_set_to_true(m_bool b) { return true; }
    * Functional Operations                                                       \
    *-------------------------------------------------------*/                    \
   fdecl(int64_t, map_pair(Ta, Tb), map_count_if,                                 \
+        (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred));                   \
+  fdecl(void, map_pair(Ta, Tb), map_foreach,                                     \
         (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred));
 
 #define MAP_GEN_C(Ta, Tb)                                                      \
@@ -243,6 +243,16 @@ m_bool m_bool_set_to_true(m_bool b) { return true; }
     return counter;                                                            \
   }                                                                            \
                                                                                \
+  ret(void) ffname(Ta, Tb, map_foreach)(map_t(Ta, Tb) * m,                     \
+                                        map_func(Ta, Tb, pred_f) f_pred) {     \
+    ffname(Ta, Tb, map_assert_init)(m);                                        \
+    for (int64_t i = 0; i < m->is_idx_open.length; i++) {                      \
+      if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
+        f_pred(map_access(Ta, Tb, at)(&m->map, i));                            \
+      }                                                                        \
+    }                                                                          \
+  }                                                                            \
+                                                                               \
   /*-------------------------------------------------------                    \
    * Static Functions                                                          \
    *-------------------------------------------------------*/                  \
@@ -305,16 +315,6 @@ m_bool m_bool_set_to_true(m_bool b) { return true; }
     return -1;                                                                 \
   }
 
-uint64_t hash_bytes(void *ptr, size_t size) {
-  /* djb2 by Dan Bernstein
-   * http://www.cse.yorku.ca/~oz/hash.html */
-  uint64_t       hash = 5381;
-  unsigned char *b_ptr = (unsigned char *)ptr;
-
-  for (size_t i = 0; i < size; i++) {
-    hash = ((hash << 5) + hash) + b_ptr[i];
-  }
-  return hash;
-}
+uint64_t hash_bytes(void *ptr, size_t size);
 
 #endif

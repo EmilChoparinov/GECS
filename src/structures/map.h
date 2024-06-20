@@ -82,7 +82,8 @@ m_bool m_bool_set_to_true(m_bool b);
   fdecl(void, map_pair(Ta, Tb), map_heap_free, (map_t(Ta, Tb) * m));             \
   fdecl(any_vec_t *, map_pair(Ta, Tb), map_to_vec,                               \
         (map_t(Ta, Tb) * m, any_vec_t * v));                                     \
-                                                                                 \
+  fdecl(any_vec_t *, map_pair(Ta, Tb), map_ptrs,                                 \
+        (map_t(Ta, Tb) * m, any_vec_t * v));                                     \
   /*------------------------------------------------------- \                    \
    * Element Operations                                                          \
    *-------------------------------------------------------*/                    \
@@ -159,6 +160,21 @@ m_bool m_bool_set_to_true(m_bool b);
       ffname(Ta, Tb, map_to_vec)(map_t(Ta, Tb) * m, any_vec_t * v) {           \
     return ffname(Ta, Tb, map_filter)(                                         \
         m, v, (map_func(Ta, Tb, pred_f))m_bool_set_to_true);                   \
+  }                                                                            \
+                                                                               \
+  ret(any_vec_t *)                                                             \
+      ffname(Ta, Tb, map_ptrs)(map_t(Ta, Tb) * m, any_vec_t * v) {             \
+    ffname(Ta, Tb, map_assert_init)(m);                                        \
+                                                                               \
+    vec_unknown_type_init(v, sizeof(void *));                                  \
+    for (int64_t i = 0; i < m->is_idx_open.length; i++) {                      \
+      if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
+        map_item_t(Ta, Tb) *item = map_access(Ta, Tb, at)(&m->map, i);         \
+        void *p = &item->value;                                                \
+        any_vec_push(v, &p);                                                   \
+      }                                                                        \
+    }                                                                          \
+    return v;                                                                  \
   }                                                                            \
                                                                                \
   /*-------------------------------------------------------                    \

@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+
 #include "gecs.h"
 
 typedef struct Vec2d Vec2d;
@@ -7,7 +8,9 @@ struct Vec2d {
   int x, y;
 };
 
-void add_ones(g_query_t *q) {}
+void add_ones(g_query_t *q) {
+  printf("Entered function!!\n");
+}
 
 int main(void) {
   g_core_t *world = g_create_world();
@@ -22,6 +25,9 @@ int main(void) {
   Vec2d *playerPos = G_GET_COMPONENT(world, player, Vec2d);
   playerPos->x = 6;
   playerPos->y = 9;
+
+  g_progress(world);
+  g_progress(world);
 
   g_destroy_world(world);
 }

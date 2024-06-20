@@ -3,7 +3,7 @@
 typedef struct system_data system_data;
 typedef system_data       *psystem_data;
 struct system_data {
-  g_system *run_system;   /* A function pointer to the system. */
+  g_system  run_system;   /* A function pointer to the system. */
   gid_vec_t requirements; /* String of components in the form "A,B,C". */
 };
 VECTOR_GEN_H(system_data);
@@ -101,8 +101,23 @@ retcode g_destroy_world(g_core_t *w) {
   return R_OKAY;
 }
 
+bool run_sys_process(void **arch) {
+  archetype *a = *arch;
+  for (size_t sys_i = 0; sys_i < a->contenders.length; sys_i++) {
+    system_data *sd = *psystem_data_vec_at(&a->contenders, sys_i);
+    sd->run_system(NULL);
+  }
+  return true;
+}
+
 retcode g_progress(g_core_t *w) {
   if (w->reprocess_fsm) _g_assign_fsm(w);
+
+  /* We run each system */
+  any_vec_t arch_vec;
+  any_vec_foreach(gid_archetype_map_ptrs(&w->archetype_registry, &arch_vec),
+                  run_sys_process);
+
   return R_OKAY;
 }
 
@@ -131,7 +146,7 @@ retcode g_register_system(g_core_t *w, g_system sys, char *query) {
 
   return system_data_vec_push(
       &w->system_registry,
-      &(system_data){.requirements = type_set, .run_system = &sys});
+      &(system_data){.requirements = type_set, .run_system = sys});
 }
 
 retcode g_add_component(g_core_t *w, gid entt_id, char *name,
@@ -151,15 +166,41 @@ void *g_get_component(g_core_t *w, gid entt_id, char *name) {
   return any_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off;
 }
 
-static retcode _g_assign_fsm(g_core_t *w) {
-  for (size_t sys_i = 0; sys_i < w->system_registry.length; sys_i++) {
-    // system_data *sd = system_data_vec_at(&w->system_registry, sys_i);
+static bool f_reset_archetypes(gid_archetype_map_item *item) {
+  psystem_data_vec_clear(&item->value.contenders);
+  return true;
+}
 
-    /* For each system, check each archetype and distribute. */
-    // gid_archetype_map_item_vec_at
-    for (size_t arc_i = 0; arc_i < w->archetype_registry.map.length; arc_i++) {
+static retcode _g_assign_fsm(g_core_t *w) {
+  /* Clear the old system positions. */
+  gid_archetype_map_foreach(&w->archetype_registry, f_reset_archetypes);
+
+  /* For each system */
+  for (size_t sys_i = 0; sys_i < w->system_registry.length; sys_i++) {
+    system_data *sd = system_data_vec_at(&w->system_registry, sys_i);
+
+    /* Get archetypes */
+    any_vec_t arch_vec;
+    gid_archetype_map_ptrs(&w->archetype_registry, &arch_vec);
+
+    /* For each archetype */
+    for (size_t arch_i = 0; arch_i < arch_vec.length; arch_i++) {
+      archetype *arch = *(archetype **)any_vec_at(&arch_vec, arch_i);
+
+      /* Check if archetype intersects. If so push and break. */
+      for (size_t type_i = 0; type_i < sd->requirements.length; type_i++) {
+        gid *type = gid_vec_at(&sd->requirements, type_i);
+
+        if (!gid_vec_has(&arch->type_set, type)) continue;
+
+        psystem_data_vec_push(&arch->contenders, &sd);
+        break;
+      }
     }
   }
+
+  w->reprocess_fsm = 0; /* Set process flag as done with reprocessing. */
+
   return R_OKAY;
 }
 

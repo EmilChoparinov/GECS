@@ -80,6 +80,8 @@ m_bool m_bool_set_to_true(m_bool b);
   fdecl(void, map_pair(Ta, Tb), map_free, (map_t(Ta, Tb) * m));                  \
   fdecl(map_t(Ta, Tb) *, map_pair(Ta, Tb), map_heap_init, (void));               \
   fdecl(void, map_pair(Ta, Tb), map_heap_free, (map_t(Ta, Tb) * m));             \
+  fdecl(any_vec_t *, map_pair(Ta, Tb), map_to_vec,                               \
+        (map_t(Ta, Tb) * m, any_vec_t * v));                                     \
                                                                                  \
   /*------------------------------------------------------- \                    \
    * Element Operations                                                          \
@@ -97,7 +99,10 @@ m_bool m_bool_set_to_true(m_bool b);
   fdecl(int64_t, map_pair(Ta, Tb), map_count_if,                                 \
         (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred));                   \
   fdecl(void, map_pair(Ta, Tb), map_foreach,                                     \
-        (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred));
+        (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred));                   \
+  fdecl(any_vec_t *, map_pair(Ta, Tb), map_filter,                               \
+        (map_t(Ta, Tb) * m, any_vec_t * filter,                                  \
+         map_func(Ta, Tb, pred_f) f_pred));
 
 #define MAP_GEN_C(Ta, Tb)                                                      \
   /* This is ok because its an "internal" datastructure type. The user doesn't \
@@ -148,6 +153,12 @@ m_bool m_bool_set_to_true(m_bool b);
                                                                                \
     ffname(Ta, Tb, map_free)(m);                                               \
     free(m);                                                                   \
+  }                                                                            \
+                                                                               \
+  ret(any_vec_t *)                                                             \
+      ffname(Ta, Tb, map_to_vec)(map_t(Ta, Tb) * m, any_vec_t * v) {           \
+    return ffname(Ta, Tb, map_filter)(                                         \
+        m, v, (map_func(Ta, Tb, pred_f))m_bool_set_to_true);                   \
   }                                                                            \
                                                                                \
   /*-------------------------------------------------------                    \
@@ -251,6 +262,26 @@ m_bool m_bool_set_to_true(m_bool b);
         f_pred(map_access(Ta, Tb, at)(&m->map, i));                            \
       }                                                                        \
     }                                                                          \
+  }                                                                            \
+                                                                               \
+  /* TODO: FIX FILTER. Filter only works on structs that are aligned. Fix it   \
+      so that the filter works for all structs including packed.*/             \
+  ret(any_vec_t *)                                                             \
+      ffname(Ta, Tb, map_filter)(map_t(Ta, Tb) * m, any_vec_t * filter,        \
+                                 map_func(Ta, Tb, pred_f) f_pred) {            \
+    ffname(Ta, Tb, map_assert_init)(m);                                        \
+                                                                               \
+    vec_unknown_type_init(filter, sizeof(Tb));                                 \
+    for (int64_t i = 0; i < m->is_idx_open.length; i++) {                      \
+      if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
+        map_item_t(Ta, Tb) *item = map_access(Ta, Tb, at)(&m->map, i);         \
+                                                                               \
+        if (f_pred(item)) {                                                    \
+          any_vec_push(filter, of_any(&item->value));                          \
+        }                                                                      \
+      }                                                                        \
+    }                                                                          \
+    return filter;                                                             \
   }                                                                            \
                                                                                \
   /*-------------------------------------------------------                    \

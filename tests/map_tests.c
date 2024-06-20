@@ -34,6 +34,8 @@ void test_push_loadfactor(void);
 void test_duplicate_handling(void);
 void test_foreach(void);
 void test_count_if(void);
+void test_filter(void);
+void test_to_vec(void);
 
 int main(void) {
   UNITY_BEGIN();
@@ -45,6 +47,8 @@ int main(void) {
   RUN_TEST(test_duplicate_handling);
   RUN_TEST(test_foreach);
   RUN_TEST(test_count_if);
+  RUN_TEST(test_filter);
+  RUN_TEST(test_to_vec);
 
   UNITY_END();
 }
@@ -155,4 +159,49 @@ void test_count_if(void) {
   }
 
   TEST_ASSERT(id_cs_map_count_if(&tmap, is_active) == 500);
+}
+
+MAP_GEN_H(int, int);
+MAP_GEN_C(int, int);
+
+bool select_filter(int_int_map_item *t) {
+  return t->value == 1 || t->value == 10;
+}
+
+void test_filter(void) {
+  int_int_map_t map;
+  int_int_map_init(&map);
+
+  for (int i = 0; i < 500; i++) {
+    TEST_ASSERT(int_int_map_put(&map, &i, &i) == R_OKAY);
+  }
+
+  // filter selects those where x = 1 and x = 10
+  any_vec_t v;
+  int_int_map_filter(&map, &v, select_filter);
+
+  int i = 1;
+  TEST_ASSERT(any_vec_has(&v, of_any(&i)));
+  i = 10;
+  TEST_ASSERT(any_vec_has(&v, of_any(&i)));
+  i = 501;
+  TEST_ASSERT(!any_vec_has(&v, of_any(&i)));
+
+  TEST_ASSERT(v.length == 2);
+}
+
+void test_to_vec(void) {
+  int_int_map_t map;
+  int_int_map_init(&map);
+
+  for (int i = 0; i < 500; i++) {
+    TEST_ASSERT(int_int_map_put(&map, &i, &i) == R_OKAY);
+  }
+
+  any_vec_t copy;
+  int_int_map_to_vec(&map, &copy);
+
+  for (int i = 0; i < 500; i++) {
+    TEST_ASSERT(any_vec_has(&copy, of_any(&i)));
+  }
 }

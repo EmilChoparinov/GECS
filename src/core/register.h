@@ -42,6 +42,9 @@ typedef void (*g_system)(g_query_t *q);
    instancing a new gecs world. */
 typedef struct g_core_t g_core_t;
 
+/* Houses a single archetype structure. */
+typedef struct archetype archetype;
+
 #include "vector.h"
 
 /*-------------------------------------------------------

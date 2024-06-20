@@ -5,8 +5,8 @@
 
 typedef struct archetype_cache archetype_cache;
 struct archetype_cache {
-  any_vec_t composite;    /* Interleaved components of this cache. */
-  gid       archetype_id; /* The associated archetype id with the cache */
+  any_vec_t  composite; /* Interleaved components of this cache. */
+  archetype *cache_of;  /* Address of the archetype this cache is linked to. */
 
   /* Pointer to the offsets stored in the real archetype. This is ok to do
    * because offsets is effectively read-only  */

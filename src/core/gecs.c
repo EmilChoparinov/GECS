@@ -4,7 +4,7 @@ typedef struct system_data system_data;
 typedef system_data       *psystem_data;
 struct system_data {
   g_system *run_system;   /* A function pointer to the system. */
-  char     *requirements; /* String of components in the form "A,B,C". */
+  gid_vec_t requirements; /* String of components in the form "A,B,C". */
 };
 VECTOR_GEN_H(system_data);
 VECTOR_GEN_C(system_data);
@@ -12,8 +12,6 @@ VECTOR_GEN_C(system_data);
 VECTOR_GEN_H(psystem_data);
 VECTOR_GEN_C(psystem_data);
 
-typedef struct archetype archetype;
-typedef archetype       *parchetype;
 struct archetype {
   gid archetype_id; /* Unique Identifier for this archetype. */
 
@@ -60,6 +58,7 @@ static retcode _g_init_archetype(g_core_t *w, archetype *a, gid_vec_t *types);
 static void    _g_free_archetype(archetype *a);
 static retcode _g_transfer_archetypes(g_core_t *w, gid entt, char *query);
 static retcode _g_archetype_key(char *types, gid_vec_t *hashes);
+static retcode _g_assign_fsm(g_core_t *w);
 static gid     hash_vec(any_vec_t *v);
 
 /*-------------------------------------------------------
@@ -102,7 +101,10 @@ retcode g_destroy_world(g_core_t *w) {
   return R_OKAY;
 }
 
-retcode g_progress(g_core_t *w);
+retcode g_progress(g_core_t *w) {
+  if (w->reprocess_fsm) _g_assign_fsm(w);
+  return R_OKAY;
+}
 
 gid g_create_entity(g_core_t *w) {
   gid id = w->id_gen++;
@@ -124,16 +126,12 @@ retcode g_register_system(g_core_t *w, g_system sys, char *query) {
   assert(query);
   assert(sys);
 
-  /* Copy so string stays safe. */
-  size_t query_len = strlen(query);
-  char  *s = malloc(query_len + 1);
-  assert(s);
-  memmove(s, query, query_len);
-  s[query_len] = '\0';
-// FIX REQUIREMENTS!
+  gid_vec_t type_set;
+  _g_archetype_key(query, &type_set);
+
   return system_data_vec_push(
       &w->system_registry,
-      &(system_data){.requirements = s, .run_system = &sys});
+      &(system_data){.requirements = type_set, .run_system = &sys});
 }
 
 retcode g_add_component(g_core_t *w, gid entt_id, char *name,
@@ -151,6 +149,18 @@ void *g_get_component(g_core_t *w, gid entt_id, char *name) {
 
   gsize comp_off = gid_gsize_map_find(&entt_rec.a->offsets, &type)->value;
   return any_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off;
+}
+
+static retcode _g_assign_fsm(g_core_t *w) {
+  for (size_t sys_i = 0; sys_i < w->system_registry.length; sys_i++) {
+    // system_data *sd = system_data_vec_at(&w->system_registry, sys_i);
+
+    /* For each system, check each archetype and distribute. */
+    // gid_archetype_map_item_vec_at
+    for (size_t arc_i = 0; arc_i < w->archetype_registry.map.length; arc_i++) {
+    }
+  }
+  return R_OKAY;
 }
 
 static retcode _g_archetype_key(char *types, gid_vec_t *hashes) {
@@ -234,13 +244,16 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt, char *query) {
     archetype a;
     _g_init_archetype(w, &a, &type_set);
     gid_archetype_map_put(&w->archetype_registry, &arch_id, &a);
+
+    /* Whenever a new archetype is added to the graph, we must re-schedule
+       where each system touches. Therefore, we want to trigger a reprocesses.*/
+    w->reprocess_fsm = 1;
   }
 
   /* Query and load the archetype */
   gid_entity_record_map_item *item =
       gid_entity_record_map_find(&w->entity_registry, &entt);
   entity_record entt_rec = item->value;
-
 
   gint index_prev = entt_rec.index;
 

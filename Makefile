@@ -221,3 +221,4 @@ clean:
 	@rm -r -f $(TST_BINS_DIR)
 	@rm -r -f $(PACKG_ZIP_FILE)
 	@rm -r -f $(DEMO_BUILD_LIB_FILE)
+	@rm -r -f ./demo/gecs

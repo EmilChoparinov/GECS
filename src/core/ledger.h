@@ -24,8 +24,8 @@ MAP_GEN_H(gid, entity_cache);
 
 typedef struct ledger ledger;
 struct ledger {
-  archetype_cache_vec_t  archetype_mutations;
-  gid_entity_cache_map_t entt_cache;
+  archetype_cache_vec_t  archetype_mutations; /* Vec : archetype cache */
+  gid_entity_cache_map_t entt_cache;          /* Map : gid -> entt cache */
 };
 
 #endif

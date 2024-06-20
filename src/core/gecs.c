@@ -17,12 +17,15 @@ typedef archetype       *parchetype;
 struct archetype {
   gid archetype_id; /* Unique Identifier for this archetype. */
 
-  any_vec_t       composite; /* Contiguous vector of interleaved compents */
-  gid_gsize_map_t offsets;   /* Map: hash(name) -> interleaved comp offset */
-
+  gid_vec_t          type_set;   /* Ordered Vec: hash(comp names) */
+  any_vec_t          composite;  /* Contiguous vector of interleaved compents */
   psystem_data_vec_t contenders; /* Vec: system_data* */
 
-  ledger cache; /* In concurrency contexts, mutations are stored here. */
+  gid_gsize_map_t offsets; /* Map: hash(name) -> interleaved comp offset */
+
+  /* The following members are made for caching purposes. */
+  ledger cache;        /* In concurrency contexts, mutations are stored here. */
+  gid    tailing_entt; /* Used to optimize defragmentation */
 };
 MAP_GEN_H(gid, archetype);
 MAP_GEN_C(gid, archetype);
@@ -53,8 +56,11 @@ struct g_core_t {
 /*-------------------------------------------------------
  * Static Forward Declarations
  *-------------------------------------------------------*/
-static retcode _g_init_archetype(g_core_t *w, archetype *a);
-static gid     _g_archetype_key(char *component_query);
+static retcode _g_init_archetype(g_core_t *w, archetype *a, gid_vec_t *types);
+static void    _g_free_archetype(archetype *a);
+static retcode _g_transfer_archetypes(g_core_t *w, gid entt, char *query);
+static retcode _g_archetype_key(char *types, gid_vec_t *hashes);
+static gid     hash_vec(any_vec_t *v);
 
 /*-------------------------------------------------------
  * Globals
@@ -83,10 +89,7 @@ g_core_t *g_create_world(void) {
 }
 
 static bool f_free_archetype(gid_archetype_map_item *it) {
-  archetype a = it->value;
-  vec_unknown_type_free(&a.composite);
-  psystem_data_vec_free(&a.contenders);
-  gid_gsize_map_free(&a.offsets);
+  _g_free_archetype(&it->value);
   return true;
 }
 retcode g_destroy_world(g_core_t *w) {
@@ -117,7 +120,7 @@ retcode g_register_component(g_core_t *w, char *name, size_t component_size) {
   return gid_gsize_map_put(&w->component_registry, &hash_name, &component_size);
 }
 
-retcode g_register_system(g_core_t *w, g_system *sys, char *query) {
+retcode g_register_system(g_core_t *w, g_system sys, char *query) {
   assert(query);
   assert(sys);
 
@@ -126,16 +129,32 @@ retcode g_register_system(g_core_t *w, g_system *sys, char *query) {
   char  *s = malloc(query_len + 1);
   assert(s);
   memmove(s, query, query_len);
-  s[query_len + 1] = '\0';
-
+  s[query_len] = '\0';
+// FIX REQUIREMENTS!
   return system_data_vec_push(
       &w->system_registry,
-      &(system_data){.requirements = s, .run_system = sys});
+      &(system_data){.requirements = s, .run_system = &sys});
 }
 
-/* Static Function Implementations */
-static gid _g_archetype_key(char *component_query) {
-  assert(component_query);
+retcode g_add_component(g_core_t *w, gid entt_id, char *name,
+                        size_t comp_size) {
+  return _g_transfer_archetypes(w, entt_id, name);
+}
+
+void *g_get_component(g_core_t *w, gid entt_id, char *name) {
+  gid_entity_record_map_item *item =
+      gid_entity_record_map_find(&w->entity_registry, &entt_id);
+  assert(item && "Entity does not exist!");
+
+  entity_record entt_rec = item->value;
+  gid           type = (gid)hash_bytes(name, strlen(name));
+
+  gsize comp_off = gid_gsize_map_find(&entt_rec.a->offsets, &type)->value;
+  return any_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off;
+}
+
+static retcode _g_archetype_key(char *types, gid_vec_t *hashes) {
+  assert(types);
   /* Since archetypes are sets, and query strings can be in the various forms
      such as "A,B,C" or "B,A,C", we need a mechanism that maps all string
      combinations into a set. We perform a sort operation with a stack vector
@@ -146,57 +165,178 @@ static gid _g_archetype_key(char *component_query) {
      Collision Detection:
      Since we are using hashing algorithms here we must be careful with
      collisions. The way we protect against collisions is by caching the
-     archetype query string and doing a memory check if they are the same. If
+     archetype sort vector and doing a memory check if they are the same. If
      a hash leads to an archetype that is **not** the archetype queried for,
      the library will assert and exit.
      */
 
   /* The group size for the regex matcher is the count of ',' in the string.
      Therefore we interate and count how many there are. */
-  gint   archetype_len = 0;
-  size_t i, str_len = strlen(component_query);
+  gint   archetype_len = 1;
+  size_t i, str_len = strlen(types);
   for (i = 0; i < str_len && i < GECS_MAX_ARCHETYPE_COMPOSITION; i++)
-    if (component_query[i] == ',') archetype_len++;
+    if (types[i] == ',') archetype_len++;
   assert(i != GECS_MAX_ARCHETYPE_COMPOSITION &&
          "Compositions allowed up to 256!");
 
-  gid_vec_t hashes;
-  gid_vec_init(&hashes);
+  gid_vec_init(hashes);
 
   regex_t    matcher;
   regmatch_t groups[GECS_MAX_ARCHETYPE_COMPOSITION];
   regcomp(&matcher, "(\\w+)", REG_EXTENDED);
 
   /* Assert that the query actually got matches. */
-  assert(regexec(&matcher, component_query, GECS_MAX_ARCHETYPE_COMPOSITION,
-                 groups, 0) != 0);
+  assert(regexec(&matcher, types, GECS_MAX_ARCHETYPE_COMPOSITION, groups, 0) !=
+         REG_NOMATCH);
 
-  for (i = 1; i < archetype_len; i++) {
+  for (size_t i = 0; i < archetype_len; i++) {
     /* groups[0] contains the full matched string, not groups. */
-    regoff_t arg_start = groups[i].rm_so;
-    regoff_t arg_end = groups[i].rm_eo;
+    regoff_t arg_start = groups[i + 1].rm_so;
+    regoff_t arg_end = groups[i + 1].rm_eo;
 
-    gid component_id =
-        (gid)hash_bytes(&component_query[arg_start], arg_end - arg_start);
+    gid component_id = (gid)hash_bytes(&types[arg_start], arg_end - arg_start);
 
-    if (hashes.length == 0) {
-      gid_vec_push(&hashes, &component_id);
+    if (hashes->length == 0) {
+      gid_vec_push(hashes, &component_id);
       continue;
     }
 
-    if (*gid_vec_top(&hashes) < component_id) {
-      gid *old_top = gid_vec_top(&hashes);
-      gid_vec_pop(&hashes);
-      gid_vec_push(&hashes, &component_id);
-      gid_vec_push(&hashes, old_top);
+    if (*gid_vec_top(hashes) < component_id) {
+      gid *old_top = gid_vec_top(hashes);
+      gid_vec_pop(hashes);
+      gid_vec_push(hashes, &component_id);
+      gid_vec_push(hashes, old_top);
       continue;
     }
 
-    gid_vec_push(&hashes, &component_id);
+    gid_vec_push(hashes, &component_id);
   }
 
   regfree(&matcher);
 
-  /* To generate the final hash location: */
-  return (gid)hash_bytes(hashes.element_head, hashes.length * sizeof(gid));
+  return R_OKAY;
 };
+
+static gid hash_vec(any_vec_t *v) {
+  return (gid)hash_bytes(v->element_head, v->length * v->__el_size);
+}
+
+static retcode _g_transfer_archetypes(g_core_t *w, gid entt, char *query) {
+  archetype *a_next, *a_prev;
+
+  /* Construct the type set and the actual type hash id */
+  gid_vec_t type_set;
+  _g_archetype_key(query, &type_set);
+  gid arch_id = hash_vec((any_vec_t *)&type_set);
+
+  /* Check archetype_registry to see if this one exists, if not: make it. */
+  if (!gid_archetype_map_has(&w->archetype_registry, &arch_id)) {
+    archetype a;
+    _g_init_archetype(w, &a, &type_set);
+    gid_archetype_map_put(&w->archetype_registry, &arch_id, &a);
+  }
+
+  /* Query and load the archetype */
+  gid_entity_record_map_item *item =
+      gid_entity_record_map_find(&w->entity_registry, &entt);
+  entity_record entt_rec = item->value;
+
+
+  gint index_prev = entt_rec.index;
+
+  a_next = &gid_archetype_map_find(&w->archetype_registry, &arch_id)->value;
+  a_prev = entt_rec.a;
+
+  /* Special Case: If its the empty archetype, we can skip the following
+     routine and just transfer */
+  if (a_prev == &empty_archetype) {
+
+    item->value.a = a_next;
+    item->value.index = a_next->composite.length;
+    any_vec_resize(&a_next->composite, a_next->composite.length + 1);
+    a_next->tailing_entt = entt;
+
+    return R_OKAY;
+  }
+
+  /* We need to maintain the component data we care about in the segment and
+     discard the rest. We do this by collecting the intersection between the new
+     and old archetypes. */
+  void *seg_prev = any_vec_at(&a_prev->composite, entt_rec.index);
+
+  item->value.a = a_next;
+  item->value.index = a_next->composite.length;
+  any_vec_resize(&a_next->composite, a_next->composite.length + 1);
+  a_next->tailing_entt = entt;
+
+  void *seg_next = any_vec_at(&a_next->composite, entt_rec.index);
+
+  gid_vec_t retained_types;
+  gid_vec_init(&retained_types);
+
+  // TODO: performance bottleneck, fix in future
+  for (size_t i = 0; i < a_prev->type_set.length; i++) {
+    gid *type = gid_vec_at(&a_prev->type_set, i);
+    if (!gid_vec_has(&a_next->type_set, type)) continue;
+
+    gsize comp_size = gid_gsize_map_find(&w->component_registry, type)->value;
+    gsize off_prev = gid_gsize_map_find(&a_prev->offsets, type)->value;
+    gsize off_next = gid_gsize_map_find(&a_next->offsets, type)->value;
+
+    memmove(seg_next + off_next, seg_prev + off_prev, comp_size);
+  }
+
+  /* We need to defragment the previous archetype. We do this by swapping the
+     last element with the new hole and updating the associated entity id. */
+  entity_record tail_rec =
+      gid_entity_record_map_find(&w->entity_registry, &a_prev->tailing_entt)
+          ->value;
+
+  void *seg_overwrite =
+      any_vec_at(&a_prev->composite, a_prev->composite.length - 1);
+  memmove(seg_prev, seg_overwrite, a_prev->composite.__el_size);
+
+  tail_rec.index = index_prev;
+  any_vec_resize(&a_prev->composite, a_prev->composite.length - 1);
+  return R_OKAY;
+}
+
+static retcode _g_init_archetype(g_core_t *w, archetype *a,
+                                 gid_vec_t *type_set) {
+  a->archetype_id = w->id_gen++;
+  a->tailing_entt = 0;
+
+  psystem_data_vec_init(&a->contenders);
+  gid_gsize_map_init(&a->offsets);
+
+  /* Store it locally */
+  gid_vec_copy(gid_vec_init(&a->type_set), type_set);
+
+  /* To construct the offset map, we increment and collect the sizes of the
+    types in order. */
+  gsize curs = 0;
+  for (int64_t i = 0; i < a->type_set.length; i++) {
+    gid *name_hash = gid_vec_at(&a->type_set, i);
+    gid_gsize_map_put(&a->offsets, name_hash, &curs);
+
+    gid_gsize_map_item component_size =
+        *gid_gsize_map_find(&w->component_registry, name_hash);
+    curs += component_size.value;
+  }
+
+  /* The length of 1 element in the composite vector is equal to the final size
+     of curs. */
+  vec_unknown_type_init(&a->composite, curs);
+
+  // TODO: add ledger
+  return R_OKAY;
+}
+static void _g_free_archetype(archetype *a) {
+  gid_vec_free(&a->type_set);
+  vec_unknown_type_free(&a->composite);
+  psystem_data_vec_free(&a->contenders);
+
+  gid_gsize_map_free(&a->offsets);
+
+  // TODO: add ledger
+}

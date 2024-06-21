@@ -21,9 +21,12 @@ struct archetype {
 
   gid_gsize_map_t offsets; /* Map: hash(name) -> interleaved comp offset */
 
-  /* The following members are made for caching purposes. */
-  ledger cache;        /* In concurrency contexts, mutations are stored here. */
-  gid    tailing_entt; /* Used to optimize defragmentation */
+  /* The following members are made for concurrency and caching purposes. */
+  gid           tailing_entt;        /* Used to optimize defragmentation */
+  g_core_t     *cache;               /* OOB mutations go here. */
+  gid_gid_map_t cache_interface;     /* Map: entt id -> c(entt id) */
+  gid_vec_t     entt_delete_queue;   /* Queue : entt id */
+  gid_vec_t    *entt_creation_queue; /* Queue : c(entt id) */
 };
 MAP_GEN_H(gid, archetype);
 MAP_GEN_C(gid, archetype);
@@ -36,6 +39,11 @@ struct entity_record {
 
 MAP_GEN_H(gid, entity_record);
 MAP_GEN_C(gid, entity_record);
+
+struct g_query_t {
+  g_core_t *world;             /* The world being queried on. */
+  gid       archetype_context; /* Which archetype this querys context is. */
+};
 
 struct g_core_t {
   gid    id_gen;        /* Counts up, makes unique IDs. */
@@ -101,11 +109,12 @@ retcode g_destroy_world(g_core_t *w) {
   return R_OKAY;
 }
 
-bool run_sys_process(void **arch) {
+bool run_sys_process(void **arch, g_core_t *world) {
   archetype *a = *arch;
   for (size_t sys_i = 0; sys_i < a->contenders.length; sys_i++) {
     system_data *sd = *psystem_data_vec_at(&a->contenders, sys_i);
-    sd->run_system(NULL);
+    sd->run_system(
+        &(g_query_t){.archetype_context = a->archetype_id, .world = world});
   }
   return true;
 }
@@ -115,21 +124,12 @@ retcode g_progress(g_core_t *w) {
 
   /* We run each system */
   any_vec_t arch_vec;
-  any_vec_foreach(gid_archetype_map_ptrs(&w->archetype_registry, &arch_vec),
-                  run_sys_process);
+  gid_archetype_map_ptrs(&w->archetype_registry, &arch_vec);
+  for (size_t i = 0; i < arch_vec.length; i++) {
+    run_sys_process(any_vec_at(&arch_vec, i), w);
+  };
 
   return R_OKAY;
-}
-
-gid g_create_entity(g_core_t *w) {
-  gid id = w->id_gen++;
-
-  /* All entities start initially at the empty archetype */
-  gid_entity_record_map_put(
-      &w->entity_registry, &id,
-      &(entity_record){.a = &empty_archetype, .index = 0});
-
-  return id;
 }
 
 retcode g_register_component(g_core_t *w, char *name, size_t component_size) {
@@ -152,8 +152,7 @@ retcode g_register_system(g_core_t *w, g_system sys, char *query) {
       &(system_data){.requirements = type_set, .run_system = sys});
 }
 
-retcode g_add_component(g_core_t *w, gid entt_id, char *name,
-                        size_t comp_size) {
+retcode g_add_component(g_core_t *w, gid entt_id, char *name) {
   gid_entity_record_map_item *item =
       gid_entity_record_map_find(&w->entity_registry, &entt_id);
   assert(item && "Entity does not exist!");
@@ -380,6 +379,37 @@ static retcode _g_archetype_key(char *types, gid_vec_t *hashes) {
   return R_OKAY;
 };
 
+gid g_create_entity(g_core_t *w) {
+  gid id = w->id_gen++;
+
+  /* All entities start initially at the empty archetype */
+  gid_entity_record_map_put(
+      &w->entity_registry, &id,
+      &(entity_record){.a = &empty_archetype, .index = 0});
+
+  return id;
+}
+
+gid gq_create_entity(g_query_t *q) {
+  // archetype *arch = gid_archetype_map_find(&q->world->archetype_registry,
+  //                                          &q->archetype_context);
+  return 0;
+}
+
+retcode g_queue_delete(g_core_t *w, gid entt) {
+  // TODO: make a set datastructure to improve the entt delete queue
+
+  gid_entity_record_map_item *entt_item =
+      gid_entity_record_map_find(&w->entity_registry, &entt);
+  assert(entt_item && "Enttiy does not exist!");
+
+  return gid_vec_push(&entt_item->value.a->entt_delete_queue, &entt);
+}
+
+retcode gq_queue_delete_entity(g_query_t *q, gid entt) {
+  return g_queue_delete(q->world, entt);
+}
+
 static gid hash_vec(any_vec_t *v) {
   return (gid)hash_bytes(v->element_head, v->length * v->__el_size);
 }
@@ -477,6 +507,14 @@ static retcode _g_init_archetype(g_core_t *w, archetype *a,
                                  gid_vec_t *type_set) {
   a->archetype_id = w->id_gen++;
   a->tailing_entt = 0;
+
+  /* Setup caching context members */
+  a->cache = g_create_world();
+  gid_gsize_map_free(&a->cache->component_registry);
+  gid_gsize_map_copy(&a->cache->component_registry, &w->component_registry);
+
+  gid_gid_map_init(&a->cache_interface);
+  gid_vec_init(&a->entt_delete_queue);
 
   psystem_data_vec_init(&a->contenders);
   gid_gsize_map_init(&a->offsets);

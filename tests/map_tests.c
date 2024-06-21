@@ -36,6 +36,7 @@ void test_foreach(void);
 void test_count_if(void);
 void test_filter(void);
 void test_to_vec(void);
+void test_map_copy(void);
 
 int main(void) {
   UNITY_BEGIN();
@@ -49,7 +50,7 @@ int main(void) {
   RUN_TEST(test_count_if);
   RUN_TEST(test_filter);
   RUN_TEST(test_to_vec);
-
+  RUN_TEST(test_map_copy);
   UNITY_END();
 }
 
@@ -204,4 +205,25 @@ void test_to_vec(void) {
   for (int i = 0; i < 500; i++) {
     TEST_ASSERT(any_vec_has(&copy, of_any(&i)));
   }
+}
+
+void test_map_copy(void) {
+  int_int_map_t orig, copy;
+  int_int_map_init(&orig);
+
+  for (int i = 0; i < 50; i++) {
+    int_int_map_put(&orig, &i, &i);
+  }
+
+  int_int_map_copy(&copy, &orig);
+
+  /* Assert pointers of memory go to different segments */
+  TEST_ASSERT(copy.is_idx_open.element_head != orig.is_idx_open.element_head);
+  TEST_ASSERT(copy.map.element_head != orig.map.element_head);
+
+  /* Assert maps are diverging  */
+  int x = 51;
+  int_int_map_put(&orig, &x, &x);
+
+  TEST_ASSERT(orig.slots_in_use == copy.slots_in_use + 1);
 }

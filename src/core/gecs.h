@@ -38,13 +38,13 @@ g_core_t *g_create_world(void);
 retcode   g_destroy_world(g_core_t *w);
 retcode   g_progress(g_core_t *w);
 
-#define G_COMPONENT(w, ty) g_register_component(w, #ty, sizeof(ty));
+#define G_COMPONENT(w, ty) g_register_component(w, #ty, sizeof(ty))
 retcode g_register_component(g_core_t *w, char *name, size_t component_size);
 
 /* Note: g_add_component is not thread safe and is intended to be used only in
          the setup context (outside of systems) */
-#define G_ADD_COMPONENT(w, id, ty) g_add_component(w, id, #ty, sizeof(ty));
-retcode g_add_component(g_core_t *w, gid entt_id, char *name, size_t comp_size);
+#define G_ADD_COMPONENT(w, id, ty) g_add_component(w, id, #ty)
+retcode g_add_component(g_core_t *w, gid entt_id, char *name);
 
 #define G_GET_COMPONENT(w, id, ty) (ty *)(g_get_component(w, id, #ty));
 void *g_get_component(g_core_t *w, gid entt_id, char *name);
@@ -53,12 +53,28 @@ void *g_get_component(g_core_t *w, gid entt_id, char *name);
   g_set_component(w, id, #ty, (void *)&(ty)__VA_ARGS__)
 retcode g_set_component(g_core_t *w, gid entt_id, char *name, void *comp);
 
-#define G_REM_COMPONENT(w, id, ty) g_rem_component(w, id, #ty);
+#define G_REM_COMPONENT(w, id, ty) g_rem_component(w, id, #ty)
 retcode g_rem_component(g_core_t *w, gid entt_id, char *name);
 
-#define G_SYSTEM(world, sys, ...) g_register_system(world, sys, #__VA_ARGS__);
+#define G_SYSTEM(world, sys, ...) g_register_system(world, sys, #__VA_ARGS__)
 retcode g_register_system(g_core_t *w, g_system sys, char *query);
 
-gid g_create_entity(g_core_t *w);
+gid     g_create_entity(g_core_t *w);
+retcode g_queue_delete(g_core_t *w, gid entt);
+
+gid     gq_create_entity(g_query_t *q);
+retcode gq_queue_delete_entity(g_query_t *q, gid entt);
+
+#define gq_add(q, id, ty) __gq_add(q, id, #ty)
+void __gq_add(g_query_t *q, gid id, char *name);
+
+#define gq_get(q, id, ty) (ty *)(__gq_get(q, id, #ty))
+void *__gq_get(g_query_t *q, gid id, char *name);
+
+#define gq_set(q, id, ty, ...) __gq_set(q, id, #ty, (void *)&(ty)__VA_ARGS__)
+retcode __gq_set(g_query_t *q, gid entt_id, char *name, void *comp);
+
+#define gq_rem(q, id, ty) __gq_rem(w, id, #ty)
+retcode __gq_rem(g_query_t *q, gid entt_id, char *name);
 
 #endif

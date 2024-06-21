@@ -86,6 +86,9 @@ m_bool m_bool_set_to_true(m_bool b);
         (map_t(Ta, Tb) * m, any_vec_t * v));                                     \
   fdecl(any_vec_t *, map_pair(Ta, Tb), map_ptrs,                                 \
         (map_t(Ta, Tb) * m, any_vec_t * v));                                     \
+  fdecl(map_t(Ta, Tb) *, map_pair(Ta, Tb), map_copy,                             \
+        (map_t(Ta, Tb) * dst, map_t(Ta, Tb) * src));                             \
+                                                                                 \
   /*------------------------------------------------------- \                    \
    * Element Operations                                                          \
    *-------------------------------------------------------*/                    \
@@ -134,6 +137,18 @@ m_bool m_bool_set_to_true(m_bool b);
     m_bool_vec_map(&m->is_idx_open, m_bool_set_to_true);                       \
                                                                                \
     return m;                                                                  \
+  }                                                                            \
+                                                                               \
+  ret(map_t(Ta, Tb) *)                                                         \
+      ffname(Ta, Tb, map_copy)(map_t(Ta, Tb) * dst, map_t(Ta, Tb) * src) {     \
+    ffname(Ta, Tb, map_assert_init)(src);                                      \
+    memmove(dst, src, sizeof(*src));                                           \
+                                                                               \
+    m_bool_vec_init(&dst->is_idx_open);                                        \
+    map_access(Ta, Tb, init)(&dst->map);                                       \
+    m_bool_vec_copy(&dst->is_idx_open, &src->is_idx_open);                     \
+    map_access(Ta, Tb, copy)(&dst->map, &src->map);                            \
+    return dst;                                                                \
   }                                                                            \
                                                                                \
   ret(void) ffname(Ta, Tb, map_free)(map_t(Ta, Tb) * m) {                      \

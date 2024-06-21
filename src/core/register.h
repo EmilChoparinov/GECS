@@ -17,9 +17,12 @@
  * GECS Types
  *-------------------------------------------------------*/
 
-/* All entites and archetypes share this same type for ids. Its int64_t not
-   uint64_t because I don't want to deal with unsignedness. */
-typedef int64_t gid;
+/* All entities and archetypes share this same type for ids. The first 32 bits
+   represents the real id of the entity. The last 32 bits represent various
+   flags for the entity. All but the remaining last bits are reserved to the
+   user to create tags. The last bit is reserved to flag the mode of the id.
+   Cached or non-cached.  */
+typedef uint64_t gid;
 
 /* A blocked 256 char type. Used mainly for interfacing component names
    between the C macro expansions of the library. This is needed because the

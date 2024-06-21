@@ -23,6 +23,7 @@
  *-------------------------------------------------------*/
 #include "ledger.h"   /* Contains the ledger implementation for concurrent 
                          contexts. */
+#include "gid.h"      /* GECS smart IDs implementation. */
 #include "register.h" /* Registers GECS types. */
 #include "retcodes.h" /* Contains return code information. */
 /*-------------------------------------------------------
@@ -59,10 +60,10 @@ retcode g_rem_component(g_core_t *w, gid entt_id, char *name);
 #define G_SYSTEM(world, sys, ...) g_register_system(world, sys, #__VA_ARGS__)
 retcode g_register_system(g_core_t *w, g_system sys, char *query);
 
-gid     g_create_entity(g_core_t *w);
-retcode g_queue_delete(g_core_t *w, gid entt);
+gid g_create_entity(g_core_t *w);
+gid gq_create_entity(g_query_t *q);
 
-gid     gq_create_entity(g_query_t *q);
+retcode g_queue_delete(g_core_t *w, gid entt);
 retcode gq_queue_delete_entity(g_query_t *q, gid entt);
 
 #define gq_add(q, id, ty) __gq_add(q, id, #ty)

@@ -66,6 +66,7 @@ typedef void *any;
    *-------------------------------------------------------*/                  \
   fdecl(T *, T, vec_at, (vector_t(T) * v, int64_t i));                         \
   fdecl(retcode, T, vec_put, (vector_t(T) * v, int64_t i, T * element));       \
+  fdecl(retcode, T, vec_delete_at, (vector_t(T) * v, int64_t idx));            \
   fdecl(retcode, T, vec_delete, (vector_t(T) * v, T * el));                    \
   fdecl(bool, T, vec_has, (vector_t(T) * v, T * element));                     \
   fdecl(int64_t, T, vec_find, (vector_t(T) * v, T * element));                 \
@@ -153,6 +154,20 @@ typedef void *any;
     return R_OKAY;                                                             \
   }                                                                            \
                                                                                \
+  ret(retcode) fname(T, vec_delete_at)(vector_t(T) * v, int64_t idx) {         \
+    fname(T, assert_init_checks)(v);                                           \
+    if (v->length - 1 == idx) {                                                \
+      fname(T, vec_pop)(v);                                                    \
+      return R_OKAY;                                                           \
+    }                                                                          \
+    void *loc = (char *)v->element_head + idx * v->__el_size;                  \
+    void *loc_next = (char *)v->element_head + (idx + 1) * v->__el_size;       \
+    memmove(loc, loc_next, v->length * v->__el_size - idx - v->__el_size);     \
+    v->length--;                                                               \
+    v->__top--;                                                                \
+    return R_OKAY;                                                             \
+  }                                                                            \
+                                                                               \
   ret(retcode) fname(T, vec_delete)(vector_t(T) * v, T * el) {                 \
     fname(T, assert_init_checks)(v);                                           \
     int64_t idx = fname(T, vec_find)(v, el);                                   \
@@ -161,11 +176,7 @@ typedef void *any;
       fname(T, vec_pop)(v);                                                    \
       return R_OKAY;                                                           \
     }                                                                          \
-    void *loc = (char *)v->element_head + idx * v->__el_size;                  \
-    void *loc_next = (char *)v->element_head + (idx + 1) * v->__el_size;       \
-    memmove(loc, loc_next, v->length * v->__el_size - idx - v->__el_size);     \
-    v->length--;                                                               \
-    return R_OKAY;                                                             \
+    return fname(T, vec_delete_at)(v, idx);                                    \
   }                                                                            \
                                                                                \
   ret(bool) fname(T, vec_has)(vector_t(T) * v, T * element) {                  \

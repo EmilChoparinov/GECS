@@ -26,7 +26,7 @@ struct archetype {
   g_core_t     *cache;               /* OOB mutations go here. */
   gid_gid_map_t cache_interface;     /* Map: entt id -> c(entt id) */
   gid_vec_t     entt_delete_queue;   /* Queue : entt id */
-  gid_vec_t    *entt_creation_queue; /* Queue : c(entt id) */
+  gid_vec_t     entt_creation_queue; /* Queue : c(entt id) */
 };
 MAP_GEN_H(gid, archetype);
 MAP_GEN_C(gid, archetype);
@@ -79,6 +79,7 @@ g_core_t *g_create_world(void) {
   g_core_t *w = malloc(sizeof(g_core_t));
 
   w->id_gen = 0;
+  GID_SET_MODE(w->id_gen, STORAGE);
   w->reprocess_fsm = 1;
 
   gid_gsize_map_init(&w->component_registry);
@@ -380,7 +381,8 @@ static retcode _g_archetype_key(char *types, gid_vec_t *hashes) {
 };
 
 gid g_create_entity(g_core_t *w) {
-  gid id = w->id_gen++;
+  GID_INCR(w->id_gen);
+  gid id = SELECT_ID(w->id_gen);
 
   /* All entities start initially at the empty archetype */
   gid_entity_record_map_put(
@@ -391,9 +393,14 @@ gid g_create_entity(g_core_t *w) {
 }
 
 gid gq_create_entity(g_query_t *q) {
-  // archetype *arch = gid_archetype_map_find(&q->world->archetype_registry,
-  //                                          &q->archetype_context);
-  return 0;
+  archetype *arch = &gid_archetype_map_find(&q->world->archetype_registry,
+                                            &q->archetype_context)
+                         ->value;
+
+  gid temp_entt_id = g_create_entity(arch->cache);
+  gid_vec_push(&arch->entt_creation_queue, &temp_entt_id);
+
+  return temp_entt_id;
 }
 
 retcode g_queue_delete(g_core_t *w, gid entt) {
@@ -401,7 +408,7 @@ retcode g_queue_delete(g_core_t *w, gid entt) {
 
   gid_entity_record_map_item *entt_item =
       gid_entity_record_map_find(&w->entity_registry, &entt);
-  assert(entt_item && "Enttiy does not exist!");
+  assert(entt_item && "Entity does not exist!");
 
   return gid_vec_push(&entt_item->value.a->entt_delete_queue, &entt);
 }
@@ -505,11 +512,14 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
 
 static retcode _g_init_archetype(g_core_t *w, archetype *a,
                                  gid_vec_t *type_set) {
-  a->archetype_id = w->id_gen++;
+  GID_INCR(w->id_gen);
+  a->archetype_id = SELECT_ID(w->id_gen);
   a->tailing_entt = 0;
 
   /* Setup caching context members */
   a->cache = g_create_world();
+
+  GID_SET_MODE(a->cache->id_gen, CACHED);
   gid_gsize_map_free(&a->cache->component_registry);
   gid_gsize_map_copy(&a->cache->component_registry, &w->component_registry);
 

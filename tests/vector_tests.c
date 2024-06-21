@@ -32,6 +32,8 @@ void add_one_to_odds_and_set_all_evens_to_active(void);
 void do_filter_multipies_of_10_and_sum_with_any_type(void);
 void push_pop_clear_256_with_any_type(void);
 void sort(void);
+void delete_items_find(void);
+void delete_by_idx(void);
 
 int main(void) {
   UNITY_BEGIN();
@@ -47,6 +49,8 @@ int main(void) {
   RUN_TEST(do_filter_multipies_of_10_and_sum_with_any_type);
   RUN_TEST(push_pop_clear_256_with_any_type);
   RUN_TEST(sort);
+  RUN_TEST(delete_items_find);
+  RUN_TEST(delete_by_idx);
 
   UNITY_END();
 }
@@ -237,4 +241,41 @@ void sort(void) {
     cs *cur = (cs *)any_vec_at(&container, i);
     TEST_ASSERT(last->x < cur->x);
   }
+}
+
+void delete_items_find(void) {
+  any_vec_t container;
+  vec_unknown_type_init(&container, sizeof(cs));
+
+  for (int i = 25; i >= 0; i--) {
+    any_vec_push(&container,
+                 (void *)&(cs){.x = i, .y = i, .z = i, .active = false});
+  }
+
+  for (int i = 25; i >= 0; i--) {
+    cs item = (cs){.x = i, .y = i, .z = i, .active = false};
+    any_vec_delete(&container, of_any(&item));
+    TEST_ASSERT(!any_vec_has(&container, of_any(&item)));
+  }
+
+  TEST_ASSERT(container.length == 0);
+}
+
+void delete_by_idx(void) {
+  any_vec_t container;
+  vec_unknown_type_init(&container, sizeof(cs));
+
+  for (int i = 25; i >= 0; i--) {
+    any_vec_push(&container,
+                 (void *)&(cs){.x = i, .y = i, .z = i, .active = false});
+  }
+
+  int itr_count = 0;
+  int original_length = container.length;
+  while (container.length != 0) {
+    any_vec_delete_at(&container, 0);
+    itr_count++;
+  }
+
+  TEST_ASSERT(itr_count == original_length);
 }

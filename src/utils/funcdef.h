@@ -15,6 +15,7 @@
 #define pred_f(T)          T##_predicate
 #define unary_f(T)         T##_unary
 #define binary_f(T)        T##_binary
+#define compare_f(T)       T##_compare
 #define ret(T)             T
 #define wrap_type(T, with) wrap_##with##_##T
 

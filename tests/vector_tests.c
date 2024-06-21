@@ -31,6 +31,7 @@ void add_one_to_odds_and_set_all_evens_to_active(void);
 
 void do_filter_multipies_of_10_and_sum_with_any_type(void);
 void push_pop_clear_256_with_any_type(void);
+void sort(void);
 
 int main(void) {
   UNITY_BEGIN();
@@ -45,6 +46,7 @@ int main(void) {
   RUN_TEST(add_one_to_odds_and_set_all_evens_to_active);
   RUN_TEST(do_filter_multipies_of_10_and_sum_with_any_type);
   RUN_TEST(push_pop_clear_256_with_any_type);
+  RUN_TEST(sort);
 
   UNITY_END();
 }
@@ -216,4 +218,23 @@ void push_pop_clear_256_with_any_type(void) {
   TEST_ASSERT(cs_vec_top((cs_vec_t *)&container)->y == 999);
 
   any_vec_free(&container);
+}
+
+bool sort_asc(cs *a, cs *b) { return a->x < b->x; }
+void sort(void) {
+  any_vec_t container;
+  vec_unknown_type_init(&container, sizeof(cs));
+
+  for (int i = 25; i >= 0; i--) {
+    any_vec_push(&container,
+                 (void *)&(cs){.x = i, .y = i, .z = i, .active = false});
+  }
+
+  any_vec_sort(&container, (any_compare)sort_asc);
+
+  for (int i = 1; i < 25; i++) {
+    cs *last = (cs *)any_vec_at(&container, i - 1);
+    cs *cur = (cs *)any_vec_at(&container, i);
+    TEST_ASSERT(last->x < cur->x);
+  }
 }

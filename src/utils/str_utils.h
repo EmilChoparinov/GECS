@@ -19,4 +19,6 @@
    of the string is 0'd out. */
 char *fix_str_256(char * str);
 
+void memswap(void *a, void *b, size_t size);
+
 #endif

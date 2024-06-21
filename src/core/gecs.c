@@ -56,7 +56,7 @@ struct g_core_t {
  *-------------------------------------------------------*/
 static retcode _g_init_archetype(g_core_t *w, archetype *a, gid_vec_t *types);
 static void    _g_free_archetype(archetype *a);
-static retcode _g_transfer_archetypes(g_core_t *w, gid entt, char *query);
+static retcode _g_transfer_archetypes(g_core_t *w, gid entt, gid_vec_t *types);
 static retcode _g_archetype_key(char *types, gid_vec_t *hashes);
 static retcode _g_assign_fsm(g_core_t *w);
 static gid     hash_vec(any_vec_t *v);
@@ -134,6 +134,7 @@ gid g_create_entity(g_core_t *w) {
 
 retcode g_register_component(g_core_t *w, char *name, size_t component_size) {
   gid hash_name = (gid)hash_bytes(name, strlen(name));
+  log_debug("hashed %s -> %ld\n", name, hash_name);
   return gid_gsize_map_put(&w->component_registry, &hash_name, &component_size);
 }
 
@@ -151,7 +152,16 @@ retcode g_register_system(g_core_t *w, g_system sys, char *query) {
 
 retcode g_add_component(g_core_t *w, gid entt_id, char *name,
                         size_t comp_size) {
-  return _g_transfer_archetypes(w, entt_id, name);
+  gid_entity_record_map_item *item =
+      gid_entity_record_map_find(&w->entity_registry, &entt_id);
+  assert(item && "Entity does not exist!");
+
+  // entity_record entt_rec = item->value;
+
+  /* Construct a union on the type sets */
+
+  return R_OKAY;
+  // return _g_transfer_archetypes(w, entt_id, &type_set);
 }
 
 void *g_get_component(g_core_t *w, gid entt_id, char *name) {
@@ -162,8 +172,57 @@ void *g_get_component(g_core_t *w, gid entt_id, char *name) {
   entity_record entt_rec = item->value;
   gid           type = (gid)hash_bytes(name, strlen(name));
 
-  gsize comp_off = gid_gsize_map_find(&entt_rec.a->offsets, &type)->value;
+  gid_gsize_map_item *typekv = gid_gsize_map_find(&entt_rec.a->offsets, &type);
+  assert(typekv && "Component not registered!");
+  gsize comp_off = typekv->value;
   return any_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off;
+}
+
+retcode g_set_component(g_core_t *w, gid entt_id, char *name, void *comp) {
+  gid type = (gid)hash_bytes(name, strlen(name));
+
+  /* Load entity */
+  gid_entity_record_map_item *entt_item =
+      gid_entity_record_map_find(&w->entity_registry, &entt_id);
+  assert(entt_item && "Entity does not exist!");
+
+  entity_record entt_rec = entt_item->value;
+
+  /* Load component offset from archetype entity is member of */
+  gid_gsize_map_item *type_item =
+      gid_gsize_map_find(&entt_rec.a->offsets, &type);
+  assert(type_item && "Component not registered!");
+
+  gsize comp_off = type_item->value;
+
+  /* Copy data into composite */
+  memmove(any_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off, comp,
+          entt_rec.a->composite.__el_size);
+  return R_OKAY;
+}
+
+retcode g_rem_component(g_core_t *w, gid entt_id, char *name) {
+  /* Collect Component ID to remove */
+  gid type = (gid)hash_bytes(name, strlen(name));
+
+  /* Load entity */
+  gid_entity_record_map_item *entt_item =
+      gid_entity_record_map_find(&w->entity_registry, &entt_id);
+  assert(entt_item && "Entity does not exist!");
+
+  // TODO: make filter and other functions take in arguments!!
+
+  /* Collect Ordered Type Set */
+  gid_vec_t type_set;
+  gid_vec_init(&type_set);
+  archetype *arch = entt_item->value.a;
+  for (size_t type_i = 0; type_i < arch->type_set.length; type_i++) {
+    gid arch_comp_type = *gid_vec_at(&arch->type_set, type_i);
+
+    if (type != arch_comp_type) gid_vec_push(&type_set, &arch_comp_type);
+  }
+
+  return _g_transfer_archetypes(w, entt_id, &type_set);
 }
 
 static bool f_reset_archetypes(gid_archetype_map_item *item) {
@@ -272,18 +331,20 @@ static gid hash_vec(any_vec_t *v) {
   return (gid)hash_bytes(v->element_head, v->length * v->__el_size);
 }
 
-static retcode _g_transfer_archetypes(g_core_t *w, gid entt, char *query) {
+static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
+                                      gid_vec_t *type_set) {
   archetype *a_next, *a_prev;
 
-  /* Construct the type set and the actual type hash id */
-  gid_vec_t type_set;
-  _g_archetype_key(query, &type_set);
-  gid arch_id = hash_vec((any_vec_t *)&type_set);
+  gid arch_id = hash_vec((any_vec_t *)type_set);
+  log_debug("transfering %ld to archetype with type hash: %ld\n", entt,
+            arch_id);
 
   /* Check archetype_registry to see if this one exists, if not: make it. */
   if (!gid_archetype_map_has(&w->archetype_registry, &arch_id)) {
     archetype a;
-    _g_init_archetype(w, &a, &type_set);
+    _g_init_archetype(w, &a, type_set);
+    log_debug("archetype not found, created id: %ld\n", a.archetype_id,
+              arch_id);
     gid_archetype_map_put(&w->archetype_registry, &arch_id, &a);
 
     /* Whenever a new archetype is added to the graph, we must re-schedule
@@ -373,9 +434,12 @@ static retcode _g_init_archetype(g_core_t *w, archetype *a,
     gid *name_hash = gid_vec_at(&a->type_set, i);
     gid_gsize_map_put(&a->offsets, name_hash, &curs);
 
-    gid_gsize_map_item component_size =
-        *gid_gsize_map_find(&w->component_registry, name_hash);
-    curs += component_size.value;
+    log_debug("collected name hash: %ld\n", *name_hash);
+
+    gid_gsize_map_item *component_size =
+        gid_gsize_map_find(&w->component_registry, name_hash);
+    assert(component_size && "Component was not registered!");
+    curs += component_size->value;
   }
 
   /* The length of 1 element in the composite vector is equal to the final size

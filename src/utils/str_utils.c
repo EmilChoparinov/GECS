@@ -12,3 +12,15 @@ char *fix_str_256(char *str) {
 
   return _str;
 }
+
+void memswap(void *a, void *b, size_t size) {
+  unsigned char  temp;
+  unsigned char *p = a;
+  unsigned char *q = b;
+
+  for (size_t i = 0; i < size; i++) {
+    temp = p[i];
+    p[i] = q[i];
+    q[i] = temp;
+  }
+}

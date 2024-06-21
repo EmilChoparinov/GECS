@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "funcdef.h"
+#include "logger.h"
 #include "retcodes.h"
 #include "str_utils.h"
 
@@ -315,5 +316,12 @@ VECTOR_GEN_H(any);
 
 any_vec_t *vec_unknown_type_init(any_vec_t *v, size_t el_size);
 any_vec_t *vec_unknown_type_heap_init(size_t el_size);
+
+/*-------------------------------------------------------
+ * Utility Functions
+ *-------------------------------------------------------*/
+#define vectors_intersect(a, b) __vectors_intersect(of_any(a), of_any(b))
+
+bool __vectors_intersect(any_vec_t *a, any_vec_t *b);
 
 #endif

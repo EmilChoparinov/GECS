@@ -134,7 +134,7 @@ gid g_create_entity(g_core_t *w) {
 
 retcode g_register_component(g_core_t *w, char *name, size_t component_size) {
   gid hash_name = (gid)hash_bytes(name, strlen(name));
-  log_debug("hashed %s -> %ld\n", name, hash_name);
+  log_debug("COMPONENT %s -> %ld\n", name, hash_name);
   return gid_gsize_map_put(&w->component_registry, &hash_name, &component_size);
 }
 
@@ -144,6 +144,8 @@ retcode g_register_system(g_core_t *w, g_system sys, char *query) {
 
   gid_vec_t type_set;
   _g_archetype_key(query, &type_set);
+
+  log_debug("SYSTEM %s -> %p\n", query, sys);
 
   return system_data_vec_push(
       &w->system_registry,
@@ -156,12 +158,36 @@ retcode g_add_component(g_core_t *w, gid entt_id, char *name,
       gid_entity_record_map_find(&w->entity_registry, &entt_id);
   assert(item && "Entity does not exist!");
 
-  // entity_record entt_rec = item->value;
+  gid_vec_t new_types, *old_types;
+  _g_archetype_key(name, &new_types);
 
-  /* Construct a union on the type sets */
+  old_types = &item->value.a->type_set;
+  assert(!vectors_intersect(old_types, &new_types) &&
+         "Some components already exist on entity!");
+
+  /* Construct a union on the type sets between the add and the entities
+     current archetype. */
+  gid_gid_map_t type_set;
+  gid_gid_map_init(&type_set);
+
+  // Add old
+  for (size_t i = 0; i < old_types->length; i++) {
+    gid p = *gid_vec_at(old_types, i);
+    gid_gid_map_put(&type_set, &p, &p);
+  }
+
+  // Add new
+  for (size_t i = 0; i < new_types.length; i++) {
+    gid p = *gid_vec_at(&new_types, i);
+    gid_gid_map_put(&type_set, &p, &p);
+  }
+
+  gid_vec_t archetype_set;
+  gid_gid_map_to_vec(&type_set, (any_vec_t *)&archetype_set);
+
+  _g_transfer_archetypes(w, entt_id, &archetype_set);
 
   return R_OKAY;
-  // return _g_transfer_archetypes(w, entt_id, &type_set);
 }
 
 void *g_get_component(g_core_t *w, gid entt_id, char *name) {
@@ -202,24 +228,27 @@ retcode g_set_component(g_core_t *w, gid entt_id, char *name, void *comp) {
 }
 
 retcode g_rem_component(g_core_t *w, gid entt_id, char *name) {
-  /* Collect Component ID to remove */
-  gid type = (gid)hash_bytes(name, strlen(name));
-
-  /* Load entity */
-  gid_entity_record_map_item *entt_item =
+  gid_entity_record_map_item *entt =
       gid_entity_record_map_find(&w->entity_registry, &entt_id);
-  assert(entt_item && "Entity does not exist!");
+  assert(entt && "Entity does not exist!");
 
-  // TODO: make filter and other functions take in arguments!!
+  /* Collect component ids from the query */
+  gid_vec_t new_types;
+  _g_archetype_key(name, &new_types);
 
-  /* Collect Ordered Type Set */
+  /* Collect component ids from the archetype */
+  gid_vec_t *old_types = &entt->value.a->type_set;
+
+  assert(!vectors_intersect(&new_types, old_types) &&
+         "Remove contains components already not on entity!");
+
+  /* Perform the difference old_types / new_types */
   gid_vec_t type_set;
-  gid_vec_init(&type_set);
-  archetype *arch = entt_item->value.a;
-  for (size_t type_i = 0; type_i < arch->type_set.length; type_i++) {
-    gid arch_comp_type = *gid_vec_at(&arch->type_set, type_i);
+  gid_vec_copy(gid_vec_init(&type_set), old_types);
 
-    if (type != arch_comp_type) gid_vec_push(&type_set, &arch_comp_type);
+  for (int64_t type_i = 0; type_i < type_set.length; type_i++) {
+    gid *cur_type = gid_vec_at(&type_set, type_i);
+    if (gid_vec_has(&new_types, cur_type)) gid_vec_delete(&type_set, cur_type);
   }
 
   return _g_transfer_archetypes(w, entt_id, &type_set);
@@ -231,8 +260,31 @@ static bool f_reset_archetypes(gid_archetype_map_item *item) {
 }
 
 static retcode _g_assign_fsm(g_core_t *w) {
+  log_debug("fsm reprocess triggered\n");
   /* Clear the old system positions. */
   gid_archetype_map_foreach(&w->archetype_registry, f_reset_archetypes);
+
+  /* For each archetype, we apply systems to the contend list that intersect on
+     types */
+  any_vec_t archetypes;
+  gid_archetype_mmap_to_vec(&w->archetype_registry, &archetypes);
+
+  for (size_t arch_i = 0; arch_i < archetypes.length; arch_i++) {
+    /* archetype** because map_to_vec returns an array of addresses to
+       the element location in the map. */
+    archetype *arch = *(archetype **)any_vec_at(&archetypes, arch_i);
+
+    for (size_t sys_i = 0; sys_i < w->system_registry.length; sys_i++) {
+      system_data *sd = system_data_vec_at(&w->system_registry, sys_i);
+      if (vectors_intersect(&arch->type_set, &sd->requirements)) {
+        psystem_data_vec_push(&arch->contenders, &sd);
+      }
+    }
+  }
+
+  w->reprocess_fsm = 0; /* Set process flag as complete. */
+
+  return R_OKAY;
 
   /* For each system */
   for (size_t sys_i = 0; sys_i < w->system_registry.length; sys_i++) {
@@ -252,6 +304,7 @@ static retcode _g_assign_fsm(g_core_t *w) {
 
         if (!gid_vec_has(&arch->type_set, type)) continue;
 
+        log_debug("Assigning %p to %ld\n", sd->run_system, arch->archetype_id);
         psystem_data_vec_push(&arch->contenders, &sd);
         break;
       }
@@ -331,10 +384,14 @@ static gid hash_vec(any_vec_t *v) {
   return (gid)hash_bytes(v->element_head, v->length * v->__el_size);
 }
 
+static bool    asc_gids(gid *a, gid *b) { return *a < *b; }
 static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
                                       gid_vec_t *type_set) {
   archetype *a_next, *a_prev;
 
+  /* By sorting the vector before processing, we effectively turn it into a
+     element set. */
+  gid_vec_sort(type_set, asc_gids);
   gid arch_id = hash_vec((any_vec_t *)type_set);
   log_debug("transfering %ld to archetype with type hash: %ld\n", entt,
             arch_id);

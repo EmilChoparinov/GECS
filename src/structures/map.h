@@ -82,6 +82,8 @@ m_bool m_bool_set_to_true(m_bool b);
   fdecl(void, map_pair(Ta, Tb), map_heap_free, (map_t(Ta, Tb) * m));             \
   fdecl(any_vec_t *, map_pair(Ta, Tb), map_to_vec,                               \
         (map_t(Ta, Tb) * m, any_vec_t * v));                                     \
+  fdecl(any_vec_t *, map_pair(Ta, Tb), mmap_to_vec,                              \
+        (map_t(Ta, Tb) * m, any_vec_t * v));                                     \
   fdecl(any_vec_t *, map_pair(Ta, Tb), map_ptrs,                                 \
         (map_t(Ta, Tb) * m, any_vec_t * v));                                     \
   /*------------------------------------------------------- \                    \
@@ -102,6 +104,9 @@ m_bool m_bool_set_to_true(m_bool b);
   fdecl(void, map_pair(Ta, Tb), map_foreach,                                     \
         (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred));                   \
   fdecl(any_vec_t *, map_pair(Ta, Tb), map_filter,                               \
+        (map_t(Ta, Tb) * m, any_vec_t * filter,                                  \
+         map_func(Ta, Tb, pred_f) f_pred));                                      \
+  fdecl(any_vec_t *, map_pair(Ta, Tb), mmap_filter,                              \
         (map_t(Ta, Tb) * m, any_vec_t * filter,                                  \
          map_func(Ta, Tb, pred_f) f_pred));
 
@@ -159,6 +164,12 @@ m_bool m_bool_set_to_true(m_bool b);
   ret(any_vec_t *)                                                             \
       ffname(Ta, Tb, map_to_vec)(map_t(Ta, Tb) * m, any_vec_t * v) {           \
     return ffname(Ta, Tb, map_filter)(                                         \
+        m, v, (map_func(Ta, Tb, pred_f))m_bool_set_to_true);                   \
+  }                                                                            \
+                                                                               \
+  ret(any_vec_t *)                                                             \
+      ffname(Ta, Tb, mmap_to_vec)(map_t(Ta, Tb) * m, any_vec_t * v) {          \
+    return ffname(Ta, Tb, mmap_filter)(                                        \
         m, v, (map_func(Ta, Tb, pred_f))m_bool_set_to_true);                   \
   }                                                                            \
                                                                                \
@@ -293,7 +304,26 @@ m_bool m_bool_set_to_true(m_bool b);
         map_item_t(Ta, Tb) *item = map_access(Ta, Tb, at)(&m->map, i);         \
                                                                                \
         if (f_pred(item)) {                                                    \
-          any_vec_push(filter, of_any(&item->value));                          \
+          any_vec_push(filter, (void *)&item->value);                          \
+        }                                                                      \
+      }                                                                        \
+    }                                                                          \
+    return filter;                                                             \
+  }                                                                            \
+                                                                               \
+  ret(any_vec_t *)                                                             \
+      ffname(Ta, Tb, mmap_filter)(map_t(Ta, Tb) * m, any_vec_t * filter,       \
+                                  map_func(Ta, Tb, pred_f) f_pred) {           \
+    ffname(Ta, Tb, map_assert_init)(m);                                        \
+                                                                               \
+    vec_unknown_type_init(filter, sizeof(void *));                             \
+    for (int64_t i = 0; i < m->is_idx_open.length; i++) {                      \
+      if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
+        map_item_t(Ta, Tb) *item = map_access(Ta, Tb, at)(&m->map, i);         \
+                                                                               \
+        if (f_pred(item)) {                                                    \
+          void *value = &item->value;                                          \
+          any_vec_push(filter, &value);                                        \
         }                                                                      \
       }                                                                        \
     }                                                                          \

@@ -49,7 +49,8 @@ retcode g_add_component(g_core_t *w, gid entt_id, char *name, size_t comp_size);
 #define G_GET_COMPONENT(w, id, ty) (ty *)(g_get_component(w, id, #ty));
 void *g_get_component(g_core_t *w, gid entt_id, char *name);
 
-#define G_SET_COMPONENT(w, id, ty, comp) g_set_component(w, id, #ty, comp);
+#define G_SET_COMPONENT(w, id, ty, ...)                                        \
+  g_set_component(w, id, #ty, (void *)&(ty)__VA_ARGS__)
 retcode g_set_component(g_core_t *w, gid entt_id, char *name, void *comp);
 
 #define G_REM_COMPONENT(w, id, ty) g_rem_component(w, id, #ty);

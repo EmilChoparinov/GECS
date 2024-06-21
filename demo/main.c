@@ -39,19 +39,22 @@ int main(void) {
   G_COMPONENT(world, BlueColor);
 
   G_SYSTEM(world, add_ones, Vec2d);
-  G_SYSTEM(world, is_blue, RedColor);
-  G_SYSTEM(world, is_red, BlueColor);
+  G_SYSTEM(world, is_red, RedColor);
+  G_SYSTEM(world, is_blue, BlueColor);
 
   player = g_create_entity(world);
   G_ADD_COMPONENT(world, player, Vec2d);
   G_ADD_COMPONENT(world, player, RedColor);
 
+  G_SET_COMPONENT(world, player, Vec2d, {.x = 6, .y = 9});
   Vec2d *playerPos = G_GET_COMPONENT(world, player, Vec2d);
-  playerPos->x = 6;
-  playerPos->y = 9;
+  printf("player pos: {x: %d, y: %d}\n", playerPos->x, playerPos->y);
 
-  g_progress(world);
-  g_progress(world);
+  for (int i = 0; i < 5; i++) {
+    log_debug("---WORLD TICK START---\n");
+    g_progress(world);
+    log_debug("---WORLD TICK END---\n");
+  }
 
   g_destroy_world(world);
 }

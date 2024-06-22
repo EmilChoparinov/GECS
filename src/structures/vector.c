@@ -1,3 +1,4 @@
+#include "debug.h"
 #include "vector.h"
 
 VECTOR_GEN_C(any);

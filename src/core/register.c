@@ -6,6 +6,7 @@
  *-------------------------------------------------------*/
 VECTOR_GEN_C(bool);
 VECTOR_GEN_C(gid);
+VECTOR_GEN_C(fragment);
 
 #include "map.h"
 

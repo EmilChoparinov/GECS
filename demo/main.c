@@ -21,14 +21,14 @@ void add_ones(g_query_t *q) { printf("Entered function!!\n"); }
 
 void is_red(g_query_t *q) {
   printf("Is now red, going to blue!\n");
-  G_ADD_COMPONENT(world, player, BlueColor);
-  G_REM_COMPONENT(world, player, RedColor);
+  gq_add(q, player, BlueColor);
+  gq_rem(q, player, RedColor);
 }
 
 void is_blue(g_query_t *q) {
   printf("Is now blue, going to red!\n");
-  G_ADD_COMPONENT(world, player, RedColor);
-  G_REM_COMPONENT(world, player, BlueColor);
+  gq_add(q, player, RedColor);
+  gq_rem(q, player, BlueColor);
 }
 
 int main(void) {

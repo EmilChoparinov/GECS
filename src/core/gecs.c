@@ -21,7 +21,7 @@ struct archetype {
   gid archetype_id; /* Unique Identifier for this archetype. */
 
   gid_vec_t          type_set;   /* Ordered Vec: hash(comp names) */
-  any_vec_t          composite;  /* Contiguous vector of interleaved compents */
+  fragment_vec_t     composite;  /* Contiguous vector of interleaved compents */
   psystem_data_vec_t contenders; /* Vec: system_data* */
 
   gid_gsize_map_t offsets; /* Map: hash(name) -> interleaved comp offset */
@@ -50,6 +50,13 @@ MAP_GEN_C(gid, entity_record);
 struct g_query_t {
   g_core_t *world;             /* The world being queried on. */
   gid       archetype_context; /* Which archetype this querys context is. */
+};
+
+struct g_itr {
+  g_query_t *query;
+  g_core_t  *world;
+  gid_vec_t *type_set;
+  gint       itr;
 };
 
 struct g_core_t {
@@ -216,7 +223,7 @@ static void *__g_get_component(g_core_t *w, gid entt_id, gid type) {
   gid_gsize_map_item *typekv = gid_gsize_map_find(&entt_rec.a->offsets, &type);
   assert(typekv && "Component not registered!");
   gsize comp_off = typekv->value;
-  return any_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off;
+  return fragment_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off;
 }
 
 void *g_get_component(g_core_t *w, gid entt_id, char *name) {
@@ -240,8 +247,8 @@ static retcode __g_set_component(g_core_t *w, gid entt_id, gid type,
   gsize comp_off = type_item->value;
 
   /* Copy data into composite */
-  memmove(any_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off, comp,
-          entt_rec.a->composite.__el_size);
+  memmove(fragment_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off,
+          comp, entt_rec.a->composite.__el_size);
   return R_OKAY;
 }
 
@@ -581,7 +588,7 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
 
     item->value.a = a_next;
     item->value.index = a_next->composite.length;
-    any_vec_resize(&a_next->composite, a_next->composite.length + 1);
+    fragment_vec_resize(&a_next->composite, a_next->composite.length + 1);
     a_next->tailing_entt = entt;
     entity_record *rec = &item->value;
     gid_pentity_record_map_put(&a_next->entt_members, &entt, &rec);
@@ -592,11 +599,11 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
   /* We need to maintain the component data we care about in the segment and
      discard the rest. We do this by collecting the intersection between the new
      and old archetypes. */
-  void *seg_prev = any_vec_at(&a_prev->composite, entt_rec.index);
+  void *seg_prev = fragment_vec_at(&a_prev->composite, entt_rec.index);
 
   item->value.a = a_next;
   item->value.index = a_next->composite.length;
-  any_vec_resize(&a_next->composite, a_next->composite.length + 1);
+  fragment_vec_resize(&a_next->composite, a_next->composite.length + 1);
 
   /* Cache update step */
   a_next->tailing_entt = entt;
@@ -604,7 +611,7 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
   gid_pentity_record_map_remove(&a_prev->entt_members, &entt);
   gid_pentity_record_map_put(&a_next->entt_members, &entt, &rec);
 
-  void *seg_next = any_vec_at(&a_next->composite, entt_rec.index);
+  void *seg_next = fragment_vec_at(&a_next->composite, entt_rec.index);
 
   gid_vec_t retained_types;
   gid_vec_init(&retained_types);
@@ -628,11 +635,11 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
           ->value;
 
   void *seg_overwrite =
-      any_vec_at(&a_prev->composite, a_prev->composite.length - 1);
+      fragment_vec_at(&a_prev->composite, a_prev->composite.length - 1);
   memmove(seg_prev, seg_overwrite, a_prev->composite.__el_size);
 
   tail_rec.index = index_prev;
-  any_vec_resize(&a_prev->composite, a_prev->composite.length - 1);
+  fragment_vec_resize(&a_prev->composite, a_prev->composite.length - 1);
   return R_OKAY;
 }
 
@@ -677,14 +684,14 @@ static retcode _g_init_archetype(g_core_t *w, archetype *a,
 
   /* The length of 1 element in the composite vector is equal to the final size
      of curs. */
-  vec_unknown_type_init(&a->composite, curs);
+  vec_unknown_type_init((any_vec_t *)&a->composite, curs);
 
   // TODO: add ledger
   return R_OKAY;
 }
 static void _g_free_archetype(archetype *a) {
   gid_vec_free(&a->type_set);
-  vec_unknown_type_free(&a->composite);
+  vec_unknown_type_free((any_vec_t *)&a->composite);
   psystem_data_vec_free(&a->contenders);
 
   gid_gsize_map_free(&a->offsets);
@@ -756,7 +763,7 @@ static bool process_cache(gid_archetype_map_item *archetype_item, void *arg) {
     entity_record *del_rec =
         &gid_entity_record_map_find(&g->entity_registry, to_del)->value;
 
-    any_vec_delete_at(&storage_archetype->composite, del_rec->index);
+    fragment_vec_delete_at(&storage_archetype->composite, del_rec->index);
     gid_pentity_record_map_remove(&storage_archetype->entt_members, to_del);
 
     /* If the entity being deleted is the last, we need to update the
@@ -789,14 +796,14 @@ static bool process_cache(gid_archetype_map_item *archetype_item, void *arg) {
         gid_entity_record_map_find(&cache->entity_registry, temp_id);
 
     void *temp_segment =
-        any_vec_at(&temp_item->value.a->composite, temp_item->value.index);
+        fragment_vec_at(&temp_item->value.a->composite, temp_item->value.index);
 
     _g_transfer_archetypes(g, perm_id, &temp_item->value.a->type_set);
 
     gid_entity_record_map_item *perm_item =
         gid_entity_record_map_find(&g->entity_registry, &perm_id);
     void *perm_segment =
-        any_vec_at(&perm_item->value.a->composite, perm_item->value.index);
+        fragment_vec_at(&perm_item->value.a->composite, perm_item->value.index);
 
     memmove(perm_segment, temp_segment,
             perm_item->value.a->composite.__el_size);

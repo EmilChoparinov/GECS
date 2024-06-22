@@ -75,7 +75,10 @@ void *__gq_get(g_query_t *q, gid id, char *name);
 #define gq_set(q, id, ty, ...) __gq_set(q, id, #ty, (void *)&(ty)__VA_ARGS__)
 retcode __gq_set(g_query_t *q, gid entt_id, char *name, void *comp);
 
-#define gq_rem(q, id, ty) __gq_rem(w, id, #ty)
+#define gq_rem(q, id, ty) __gq_rem(q, id, #ty)
 retcode __gq_rem(g_query_t *q, gid entt_id, char *name);
+
+#define gq_collect(q, ...) __gq_collect(q, #__VA_ARGS__)
+g_itr __gq_collect(g_query_t *q, char *query);
 
 #endif

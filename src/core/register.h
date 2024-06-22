@@ -13,6 +13,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "map.h"
+#include "set.h"
+#include "vector.h"
+
 /*-------------------------------------------------------
  * GECS Types
  *-------------------------------------------------------*/
@@ -35,6 +39,13 @@ typedef size_t gsize;
 
 typedef int64_t gint;
 
+typedef struct g_itr g_itr;
+
+/* Since the composite vector knows nothing about the arrangement of data
+   inside each element. Its effectively the any vector. The fragments part is
+   for flavor for the user. */
+typedef any fragment;
+
 /* Type representing the interface given to each system. */
 typedef struct g_query_t g_query_t;
 
@@ -48,15 +59,12 @@ typedef struct g_core_t g_core_t;
 /* Houses a single archetype structure. */
 typedef struct archetype archetype;
 
-#include "vector.h"
-
 /*-------------------------------------------------------
  * Vector Types
  *-------------------------------------------------------*/
 VECTOR_GEN_H(bool)
 VECTOR_GEN_H(gid);
-
-#include "map.h"
+VECTOR_GEN_H(fragment);
 
 /*-------------------------------------------------------
  * Map Types
@@ -64,8 +72,6 @@ VECTOR_GEN_H(gid);
 MAP_GEN_H(gid, gsize);
 MAP_GEN_H(gid, gid);
 MAP_GEN_H(gstr, gint);
-
-#include "set.h"
 
 /*-------------------------------------------------------
  * Set Types

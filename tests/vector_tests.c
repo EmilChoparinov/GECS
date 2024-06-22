@@ -86,8 +86,8 @@ void count_5_circles(void) {
   }
 }
 
-bool find_5(cs *a) { return a->x == 5; }
-bool find_100(cs *a) { return a->x == 100; }
+bool find_5(cs *a, void *arg) { return a->x == 5; }
+bool find_100(cs *a, void *arg) { return a->x == 100; }
 
 void has_random_element(void) {
   for (int i = 0; i < 100; i++) {
@@ -97,8 +97,8 @@ void has_random_element(void) {
   cs_vec_t copy;
   cs_vec_copy(cs_vec_init(&copy), &vector);
 
-  cs_vec_filter(&vector, find_5);
-  cs_vec_filter(&copy, find_100);
+  cs_vec_filter(&vector, find_5, NULL);
+  cs_vec_filter(&copy, find_100, NULL);
 
   TEST_ASSERT(vector.length == 1);
   TEST_ASSERT(copy.length == 0);
@@ -106,18 +106,18 @@ void has_random_element(void) {
   cs_vec_free(&copy);
 }
 
-bool is_mult_10(cs *a) { return a->x % 10 == 0; }
+bool is_mult_10(cs *a, void *arg) { return a->x % 10 == 0; }
 
 void count_multiples_of_10_to_100(void) {
   for (int i = 0; i < 100; i++) {
     cs_vec_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
   }
 
-  cs_vec_filter(&vector, is_mult_10);
+  cs_vec_filter(&vector, is_mult_10, NULL);
   TEST_ASSERT(vector.length == 10);
 }
 
-cs adder(cs residual, cs *next) {
+cs adder(cs residual, cs *next, void *arg) {
   residual.x += next->x;
   return residual;
 }
@@ -126,23 +126,23 @@ void filter_multiples_of_10_and_sum(void) {
     cs_vec_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
   }
 
-  cs sum =
-      cs_vec_foldl(cs_vec_filter(&vector, is_mult_10), adder, (cs){.x = 0});
+  cs sum = cs_vec_foldl(cs_vec_filter(&vector, is_mult_10, NULL), adder,
+                        (cs){.x = 0}, NULL);
   TEST_ASSERT(sum.x == 450);
 }
 
-cs divide_2(cs a) {
+cs divide_2(cs a, void *arg) {
   if (a.x == 0) return a;
   a.x /= 2;
   return a;
 }
-bool is_mult_2(cs *a) { return a->x % 2 == 0; }
+bool is_mult_2(cs *a, void *arg) { return a->x % 2 == 0; }
 void divide_all_even_numbers_by_2_under_100(void) {
   for (int i = 0; i < 100; i++) {
     cs_vec_push(&vector, &(cs){.x = i, .y = i, .z = i, .active = false});
   }
 
-  cs_vec_map(cs_vec_filter(&vector, is_mult_2), divide_2);
+  cs_vec_map(cs_vec_filter(&vector, is_mult_2, NULL), divide_2, NULL);
 
   int indexer = 0;
   int counter = 0;
@@ -156,12 +156,12 @@ void divide_all_even_numbers_by_2_under_100(void) {
   TEST_ASSERT(vector.length == counter);
 }
 
-bool is_active(cs *a) { return a->active; }
-cs   to_odd_map(cs a) {
+bool is_active(cs *a, void *arg) { return a->active; }
+cs   to_odd_map(cs a, void *arg) {
   a.x = a.x % 2 == 0 ? a.x : a.x + 1;
   return a;
 }
-cs activate(cs a) {
+cs activate(cs a, void *arg) {
   a.active = true;
   return a;
 }
@@ -173,8 +173,9 @@ void add_one_to_odds_and_set_all_evens_to_active(void) {
   cs_vec_t all_active;
   cs_vec_copy(cs_vec_init(&all_active), &vector);
 
-  cs_vec_filter(cs_vec_map(cs_vec_map(&all_active, to_odd_map), activate),
-                is_active);
+  cs_vec_filter(
+      cs_vec_map(cs_vec_map(&all_active, to_odd_map, NULL), activate, NULL),
+      is_active, NULL);
 
   TEST_ASSERT(all_active.length == vector.length);
   cs_vec_free(&all_active);
@@ -191,8 +192,8 @@ void do_filter_multipies_of_10_and_sum_with_any_type(void) {
 
   // We cannot fold because the the initial value will be void type. We need to
   // cast and use the correct type to fold!
-  cs sum = cs_vec_foldl(cs_vec_filter((cs_vec_t *)&container, is_mult_10),
-                        adder, (cs){.x = 0});
+  cs sum = cs_vec_foldl(cs_vec_filter((cs_vec_t *)&container, is_mult_10, NULL),
+                        adder, (cs){.x = 0}, NULL);
 
   TEST_ASSERT(sum.x == 450);
 
@@ -234,7 +235,7 @@ void sort(void) {
                  (void *)&(cs){.x = i, .y = i, .z = i, .active = false});
   }
 
-  any_vec_sort(&container, (any_compare)sort_asc);
+  any_vec_sort(&container, (any_compare)sort_asc, NULL);
 
   for (int i = 1; i < 25; i++) {
     cs *last = (cs *)any_vec_at(&container, i - 1);

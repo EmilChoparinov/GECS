@@ -23,7 +23,7 @@ any_vec_t *vec_unknown_type_heap_init(size_t el_size) {
 bool __vectors_intersect(any_vec_t *a, any_vec_t *b) {
   if (a->__el_size != b->__el_size) {
     log_warn("[vectors_intersect]: attempted to compare vectors with different "
-             "element sizes: %ld, %ld",
+             "element sizes: %ld, %ld\n",
              a->__el_size, b->__el_size);
     return false;
   }

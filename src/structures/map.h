@@ -43,7 +43,7 @@ VECTOR_GEN_H(m_bool);
 #define map_access(Ta, Tb, func) Ta##_##Tb##_map_item_vec_##func
 
 /* Used to zero out map. */
-m_bool m_bool_set_to_true(m_bool b);
+m_bool m_bool_set_to_true(m_bool b, void *arg);
 #define MAP_GEN_FORWARD(Ta, Tb)                                                \
   /*-------------------------------------------------------                    \
    * Define Datastructures                                                     \
@@ -70,7 +70,7 @@ m_bool m_bool_set_to_true(m_bool b);
   /*-------------------------------------------------------                      \
    * Define Comparator Types                                                     \
    *-------------------------------------------------------*/                    \
-  typedef bool (*map_func(Ta, Tb, pred_f))(map_item_t(Ta, Tb) * a);              \
+  typedef bool (*map_func(Ta, Tb, pred_f))(map_item_t(Ta, Tb) * a, void *arg);   \
   typedef map_item_t(Ta, Tb) (*map_func(Ta, Tb, unary_f))(map_item_t(Ta, Tb));   \
                                                                                  \
   /*-------------------------------------------------------                      \
@@ -78,6 +78,7 @@ m_bool m_bool_set_to_true(m_bool b);
    *-------------------------------------------------------*/                    \
   fdecl(map_t(Ta, Tb) *, map_pair(Ta, Tb), map_init, (map_t(Ta, Tb) * m));       \
   fdecl(void, map_pair(Ta, Tb), map_free, (map_t(Ta, Tb) * m));                  \
+  fdecl(void, map_pair(Ta, Tb), map_clear, (map_t(Ta, Tb) * m));                 \
   fdecl(map_t(Ta, Tb) *, map_pair(Ta, Tb), map_heap_init, (void));               \
   fdecl(void, map_pair(Ta, Tb), map_heap_free, (map_t(Ta, Tb) * m));             \
   fdecl(any_vec_t *, map_pair(Ta, Tb), map_to_vec,                               \
@@ -103,15 +104,17 @@ m_bool m_bool_set_to_true(m_bool b);
    * Functional Operations                                                       \
    *-------------------------------------------------------*/                    \
   fdecl(int64_t, map_pair(Ta, Tb), map_count_if,                                 \
-        (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred));                   \
+        (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred, void *arg));        \
   fdecl(void, map_pair(Ta, Tb), map_foreach,                                     \
-        (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred));                   \
+        (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred, void *arg));        \
   fdecl(any_vec_t *, map_pair(Ta, Tb), map_filter,                               \
         (map_t(Ta, Tb) * m, any_vec_t * filter,                                  \
-         map_func(Ta, Tb, pred_f) f_pred));                                      \
+         map_func(Ta, Tb, pred_f) f_pred, void *arg));                           \
   fdecl(any_vec_t *, map_pair(Ta, Tb), mmap_filter,                              \
         (map_t(Ta, Tb) * m, any_vec_t * filter,                                  \
-         map_func(Ta, Tb, pred_f) f_pred));
+         map_func(Ta, Tb, pred_f) f_pred, void *arg));                           \
+  fdecl(map_item_t(Ta, Tb) *, map_pair(Ta, Tb), ffind_one,                       \
+        (map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred, void *arg));
 
 #define MAP_GEN_C(Ta, Tb)                                                      \
   /* This is ok because its an "internal" datastructure type. The user doesn't \
@@ -134,7 +137,7 @@ m_bool m_bool_set_to_true(m_bool b);
                                                                                \
     m_bool_vec_init(&m->is_idx_open);                                          \
     m_bool_vec_resize(&m->is_idx_open, m->__size);                             \
-    m_bool_vec_map(&m->is_idx_open, m_bool_set_to_true);                       \
+    m_bool_vec_map(&m->is_idx_open, m_bool_set_to_true, NULL);                 \
                                                                                \
     return m;                                                                  \
   }                                                                            \
@@ -167,6 +170,13 @@ m_bool m_bool_set_to_true(m_bool b);
     return m;                                                                  \
   }                                                                            \
                                                                                \
+  ret(void) ffname(Ta, Tb, map_clear)(map_t(Ta, Tb) * m) {                     \
+    m->slots_in_use = 0;                                                       \
+    map_access(Ta, Tb, clear)(&m->map);                                        \
+    m_bool_vec_clear(&m->is_idx_open);                                         \
+    m_bool_vec_map(&m->is_idx_open, m_bool_set_to_true, NULL);                 \
+  }                                                                            \
+                                                                               \
   ret(void) ffname(Ta, Tb, map_heap_free)(map_t(Ta, Tb) * m) {                 \
     ffname(Ta, Tb, map_assert_init)(m);                                        \
     m->__size = MAP_DEFAULT_SIZE;                                              \
@@ -179,13 +189,13 @@ m_bool m_bool_set_to_true(m_bool b);
   ret(any_vec_t *)                                                             \
       ffname(Ta, Tb, map_to_vec)(map_t(Ta, Tb) * m, any_vec_t * v) {           \
     return ffname(Ta, Tb, map_filter)(                                         \
-        m, v, (map_func(Ta, Tb, pred_f))m_bool_set_to_true);                   \
+        m, v, (map_func(Ta, Tb, pred_f))m_bool_set_to_true, NULL);             \
   }                                                                            \
                                                                                \
   ret(any_vec_t *)                                                             \
       ffname(Ta, Tb, mmap_to_vec)(map_t(Ta, Tb) * m, any_vec_t * v) {          \
     return ffname(Ta, Tb, mmap_filter)(                                        \
-        m, v, (map_func(Ta, Tb, pred_f))m_bool_set_to_true);                   \
+        m, v, (map_func(Ta, Tb, pred_f))m_bool_set_to_true, NULL);             \
   }                                                                            \
                                                                                \
   ret(any_vec_t *)                                                             \
@@ -282,13 +292,13 @@ m_bool m_bool_set_to_true(m_bool b);
   /*-------------------------------------------------------                    \
    * Functional Operations                                                     \
    *-------------------------------------------------------*/                  \
-  ret(int64_t) ffname(Ta, Tb, map_count_if)(map_t(Ta, Tb) * m,                 \
-                                            map_func(Ta, Tb, pred_f) f_pred) { \
+  ret(int64_t) ffname(Ta, Tb, map_count_if)(                                   \
+      map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred, void *arg) {         \
     ffname(Ta, Tb, map_assert_init)(m);                                        \
     int64_t counter = 0;                                                       \
     for (int64_t i = 0; i < m->is_idx_open.length; i++) {                      \
       if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
-        if (f_pred(map_access(Ta, Tb, at)(&m->map, i))) {                      \
+        if (f_pred(map_access(Ta, Tb, at)(&m->map, i), arg)) {                 \
           counter++;                                                           \
         }                                                                      \
       }                                                                        \
@@ -296,12 +306,12 @@ m_bool m_bool_set_to_true(m_bool b);
     return counter;                                                            \
   }                                                                            \
                                                                                \
-  ret(void) ffname(Ta, Tb, map_foreach)(map_t(Ta, Tb) * m,                     \
-                                        map_func(Ta, Tb, pred_f) f_pred) {     \
+  ret(void) ffname(Ta, Tb, map_foreach)(                                       \
+      map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred, void *arg) {         \
     ffname(Ta, Tb, map_assert_init)(m);                                        \
     for (int64_t i = 0; i < m->is_idx_open.length; i++) {                      \
       if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
-        f_pred(map_access(Ta, Tb, at)(&m->map, i));                            \
+        f_pred(map_access(Ta, Tb, at)(&m->map, i), arg);                       \
       }                                                                        \
     }                                                                          \
   }                                                                            \
@@ -310,7 +320,7 @@ m_bool m_bool_set_to_true(m_bool b);
       so that the filter works for all structs including packed.*/             \
   ret(any_vec_t *)                                                             \
       ffname(Ta, Tb, map_filter)(map_t(Ta, Tb) * m, any_vec_t * filter,        \
-                                 map_func(Ta, Tb, pred_f) f_pred) {            \
+                                 map_func(Ta, Tb, pred_f) f_pred, void *arg) { \
     ffname(Ta, Tb, map_assert_init)(m);                                        \
                                                                                \
     vec_unknown_type_init(filter, sizeof(Tb));                                 \
@@ -318,7 +328,7 @@ m_bool m_bool_set_to_true(m_bool b);
       if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
         map_item_t(Ta, Tb) *item = map_access(Ta, Tb, at)(&m->map, i);         \
                                                                                \
-        if (f_pred(item)) {                                                    \
+        if (f_pred(item, arg)) {                                               \
           any_vec_push(filter, (void *)&item->value);                          \
         }                                                                      \
       }                                                                        \
@@ -326,9 +336,9 @@ m_bool m_bool_set_to_true(m_bool b);
     return filter;                                                             \
   }                                                                            \
                                                                                \
-  ret(any_vec_t *)                                                             \
-      ffname(Ta, Tb, mmap_filter)(map_t(Ta, Tb) * m, any_vec_t * filter,       \
-                                  map_func(Ta, Tb, pred_f) f_pred) {           \
+  ret(any_vec_t *) ffname(Ta, Tb, mmap_filter)(                                \
+      map_t(Ta, Tb) * m, any_vec_t * filter, map_func(Ta, Tb, pred_f) f_pred,  \
+      void *arg) {                                                             \
     ffname(Ta, Tb, map_assert_init)(m);                                        \
                                                                                \
     vec_unknown_type_init(filter, sizeof(void *));                             \
@@ -336,7 +346,7 @@ m_bool m_bool_set_to_true(m_bool b);
       if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
         map_item_t(Ta, Tb) *item = map_access(Ta, Tb, at)(&m->map, i);         \
                                                                                \
-        if (f_pred(item)) {                                                    \
+        if (f_pred(item, arg)) {                                               \
           void *value = &item->value;                                          \
           any_vec_push(filter, &value);                                        \
         }                                                                      \
@@ -345,6 +355,18 @@ m_bool m_bool_set_to_true(m_bool b);
     return filter;                                                             \
   }                                                                            \
                                                                                \
+  ret(map_item_t(Ta, Tb) *) ffname(Ta, Tb, ffind_one)(                         \
+      map_t(Ta, Tb) * m, map_func(Ta, Tb, pred_f) f_pred, void *arg) {         \
+    ffname(Ta, Tb, map_assert_init)(m);                                        \
+                                                                               \
+    for (int64_t i = 0; i < m->is_idx_open.length; i++) {                      \
+      if (!*m_bool_vec_at(&m->is_idx_open, i)) {                               \
+        map_item_t(Ta, Tb) *item = map_access(Ta, Tb, at)(&m->map, i);         \
+        if (f_pred(item, arg)) return item;                                    \
+      }                                                                        \
+    }                                                                          \
+    return NULL;                                                               \
+  }                                                                            \
   /*-------------------------------------------------------                    \
    * Static Functions                                                          \
    *-------------------------------------------------------*/                  \
@@ -370,7 +392,7 @@ m_bool m_bool_set_to_true(m_bool b);
     double_map.__size = m->__size * 2;                                         \
     m_bool_vec_resize(&double_map.is_idx_open, double_map.__size);             \
     map_access(Ta, Tb, resize)(&double_map.map, double_map.__size);            \
-    m_bool_vec_map(&double_map.is_idx_open, m_bool_set_to_true);               \
+    m_bool_vec_map(&double_map.is_idx_open, m_bool_set_to_true, NULL);         \
                                                                                \
     for (int64_t slot_idx = 0; slot_idx < m->is_idx_open.length; slot_idx++) { \
       if (!*m_bool_vec_at(&m->is_idx_open, slot_idx)) {                        \

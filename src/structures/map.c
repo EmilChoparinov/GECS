@@ -1,6 +1,6 @@
 #include "map.h"
 
-m_bool m_bool_set_to_true(bool b) { return true; }
+m_bool m_bool_set_to_true(bool b, void *arg) { return true; }
 
 uint64_t hash_bytes(void *ptr, size_t size) {
   /* djb2 by Dan Bernstein

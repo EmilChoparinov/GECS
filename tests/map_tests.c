@@ -138,7 +138,7 @@ void test_duplicate_handling(void) {
   }
 }
 
-bool is_active(id_cs_map_item *it) {
+bool is_active(id_cs_map_item *it, void *arg) {
   TEST_ASSERT(it->value.active);
   return it->value.active;
 }
@@ -149,7 +149,7 @@ void test_foreach(void) {
                 R_OKAY);
   }
 
-  id_cs_map_foreach(&tmap, is_active);
+  id_cs_map_foreach(&tmap, is_active, NULL);
 }
 
 void test_count_if(void) {
@@ -159,13 +159,13 @@ void test_count_if(void) {
                 R_OKAY);
   }
 
-  TEST_ASSERT(id_cs_map_count_if(&tmap, is_active) == 500);
+  TEST_ASSERT(id_cs_map_count_if(&tmap, is_active, NULL) == 500);
 }
 
 MAP_GEN_H(int, int);
 MAP_GEN_C(int, int);
 
-bool select_filter(int_int_map_item *t) {
+bool select_filter(int_int_map_item *t, void *arg) {
   return t->value == 1 || t->value == 10;
 }
 
@@ -179,7 +179,7 @@ void test_filter(void) {
 
   // filter selects those where x = 1 and x = 10
   any_vec_t v;
-  int_int_map_filter(&map, &v, select_filter);
+  int_int_map_filter(&map, &v, select_filter, NULL);
 
   int i = 1;
   TEST_ASSERT(any_vec_has(&v, of_any(&i)));

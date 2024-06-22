@@ -67,7 +67,7 @@ retcode g_queue_delete(g_core_t *w, gid entt);
 retcode gq_queue_delete_entity(g_query_t *q, gid entt);
 
 #define gq_add(q, id, ty) __gq_add(q, id, #ty)
-void __gq_add(g_query_t *q, gid id, char *name);
+retcode __gq_add(g_query_t *q, gid id, char *name);
 
 #define gq_get(q, id, ty) (ty *)(__gq_get(q, id, #ty))
 void *__gq_get(g_query_t *q, gid id, char *name);

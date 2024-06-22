@@ -43,10 +43,10 @@ typedef void *any;
   /*-------------------------------------------------------                    \
    * Define Comparator Types                                                   \
    *-------------------------------------------------------*/                  \
-  typedef bool (*pred_f(T))(T * a);                                            \
-  typedef T (*unary_f(T))(T);                                                  \
-  typedef T (*binary_f(T))(T, T * b);                                          \
-  typedef bool (*compare_f(T))(T * a, T * b);                                  \
+  typedef bool (*pred_f(T))(T * a, void *arg);                                 \
+  typedef T (*unary_f(T))(T, void *arg);                                       \
+  typedef T (*binary_f(T))(T, T * b, void *arg);                               \
+  typedef bool (*compare_f(T))(T * a, T * b, void *arg);                       \
                                                                                \
   /*-------------------------------------------------------                    \
    * CONTAINER OPERATIONS                                                      \
@@ -59,7 +59,7 @@ typedef void *any;
   fdecl(retcode, T, vec_resize, (vector_t(T) * v, int64_t size));              \
   fdecl(retcode, T, vec_copy, (vector_t(T) * dest, vector_t(T) * src));        \
   fdecl(retcode, T, vec_clear, (vector_t(T) * v));                             \
-  fdecl(retcode, T, vec_sort, (vector_t(T) * v, compare_f(T) cmp));            \
+  fdecl(retcode, T, vec_sort, (vector_t(T) * v, compare_f(T) cmp, void *arg)); \
                                                                                \
   /*------------------------------------------------------- \                  \
    * Element Operations                                                        \
@@ -78,11 +78,15 @@ typedef void *any;
   /*-------------------------------------------------------                    \
    * Functional Operations                                                     \
    *-------------------------------------------------------*/                  \
-  fdecl(int64_t, T, vec_count_if, (vector_t(T) * v, pred_f(T) f_pred));        \
-  fdecl(vector_t(T) *, T, vec_filter, (vector_t(T) * v, pred_f(T) f_pred));    \
-  fdecl(void, T, vec_foreach, (vector_t(T) * v, pred_f(T) f_pred));            \
-  fdecl(vector_t(T) *, T, vec_map, (vector_t(T) * v, unary_f(T) f_unary));     \
-  fdecl(T, T, vec_foldl, (vector_t(T) * v, binary_f(T) f_binary, T start));
+  fdecl(int64_t, T, vec_count_if,                                              \
+        (vector_t(T) * v, pred_f(T) f_pred, void *arg));                       \
+  fdecl(vector_t(T) *, T, vec_filter,                                          \
+        (vector_t(T) * v, pred_f(T) f_pred, void *arg));                       \
+  fdecl(void, T, vec_foreach, (vector_t(T) * v, pred_f(T) f_pred, void *arg)); \
+  fdecl(vector_t(T) *, T, vec_map,                                             \
+        (vector_t(T) * v, unary_f(T) f_unary, void *arg));                     \
+  fdecl(T, T, vec_foldl,                                                       \
+        (vector_t(T) * v, binary_f(T) f_binary, T start, void *arg));
 
 #define VECTOR_GEN_C(T)                                                        \
   static void fname(T, assert_init_checks)(vector_t(T) * v);                   \
@@ -246,35 +250,38 @@ typedef void *any;
     v->__top = 0;                                                              \
     return R_OKAY;                                                             \
   }                                                                            \
-  ret(retcode) fname(T, vec_sort)(vector_t(T) * v, compare_f(T) cmp) {         \
+  ret(retcode)                                                                 \
+      fname(T, vec_sort)(vector_t(T) * v, compare_f(T) cmp, void *arg) {       \
     fname(T, assert_init_checks)(v);                                           \
                                                                                \
     int64_t i, j;                                                              \
     for (i = 0; i < v->length; i++) {                                          \
       for (j = 0; j < v->length - i - 1; j++) {                                \
-        if (!cmp(fname(T, vec_at)(v, j), fname(T, vec_at)(v, j + 1)))          \
+        if (!cmp(fname(T, vec_at)(v, j), fname(T, vec_at)(v, j + 1), arg))     \
           fname(T, vec_swap)(v, j, j + 1);                                     \
       }                                                                        \
     }                                                                          \
     return R_OKAY;                                                             \
   }                                                                            \
                                                                                \
-  ret(int64_t) fname(T, vec_count_if)(vector_t(T) * v, pred_f(T) f_pred) {     \
+  ret(int64_t)                                                                 \
+      fname(T, vec_count_if)(vector_t(T) * v, pred_f(T) f_pred, void *arg) {   \
     fname(T, assert_init_checks)(v);                                           \
     int64_t counter = 0;                                                       \
     for (int64_t i = 0; i < v->length; i++)                                    \
-      if (f_pred(&v->element_head[i])) counter++;                              \
+      if (f_pred(&v->element_head[i], arg)) counter++;                         \
     return counter;                                                            \
   }                                                                            \
                                                                                \
-  ret(vector_t(T) *) fname(T, vec_filter)(vector_t(T) * v, pred_f(T) f_pred) { \
+  ret(vector_t(T) *)                                                           \
+      fname(T, vec_filter)(vector_t(T) * v, pred_f(T) f_pred, void *arg) {     \
     fname(T, assert_init_checks)(v);                                           \
                                                                                \
     vector_t(T) filter;                                                        \
     fname(T, vec_init)(&filter);                                               \
                                                                                \
     for (int64_t i = 0; i < v->length; i++)                                    \
-      if (f_pred(&v->element_head[i]))                                         \
+      if (f_pred(&v->element_head[i], arg))                                    \
         fname(T, vec_push)(&filter, &v->element_head[i]);                      \
                                                                                \
     /* Free the internals of the *v vector and copy over the local one. */     \
@@ -283,26 +290,29 @@ typedef void *any;
     return v;                                                                  \
   }                                                                            \
                                                                                \
-  ret(void) fname(T, vec_foreach)(vector_t(T) * v, pred_f(T) f_pred) {         \
+  ret(void)                                                                    \
+      fname(T, vec_foreach)(vector_t(T) * v, pred_f(T) f_pred, void *arg) {    \
     fname(T, assert_init_checks)(v);                                           \
-    for (int64_t i = 0; i < v->length; i++) f_pred(&v->element_head[i]);       \
+    for (int64_t i = 0; i < v->length; i++) f_pred(&v->element_head[i], arg);  \
   }                                                                            \
                                                                                \
-  ret(vector_t(T) *) fname(T, vec_map)(vector_t(T) * v, unary_f(T) f_unary) {  \
+  ret(vector_t(T) *)                                                           \
+      fname(T, vec_map)(vector_t(T) * v, unary_f(T) f_unary, void *arg) {      \
     fname(T, assert_init_checks)(v);                                           \
                                                                                \
     for (int64_t i = 0; i < v->length; i++)                                    \
-      v->element_head[i] = f_unary(v->element_head[i]);                        \
+      v->element_head[i] = f_unary(v->element_head[i], arg);                   \
                                                                                \
     return v;                                                                  \
   }                                                                            \
                                                                                \
-  ret(T) fname(T, vec_foldl)(vector_t(T) * v, binary_f(T) f_binary, T start) { \
+  ret(T) fname(T, vec_foldl)(vector_t(T) * v, binary_f(T) f_binary, T start,   \
+                             void *arg) {                                      \
     fname(T, assert_init_checks)(v);                                           \
                                                                                \
     T result = start;                                                          \
     for (int64_t i = 0; i < v->length; i++)                                    \
-      result = f_binary(result, &v->element_head[i]);                          \
+      result = f_binary(result, &v->element_head[i], arg);                     \
                                                                                \
     return result;                                                             \
   }                                                                            \

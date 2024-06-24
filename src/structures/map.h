@@ -173,7 +173,10 @@ m_bool m_bool_set_to_true(m_bool b, void *arg);
   ret(void) ffname(Ta, Tb, map_clear)(map_t(Ta, Tb) * m) {                     \
     m->slots_in_use = 0;                                                       \
     map_access(Ta, Tb, clear)(&m->map);                                        \
+    map_access(Ta, Tb, resize)(&m->map, m->__size);                            \
+                                                                               \
     m_bool_vec_clear(&m->is_idx_open);                                         \
+    m_bool_vec_resize(&m->is_idx_open, m->__size);                             \
     m_bool_vec_map(&m->is_idx_open, m_bool_set_to_true, NULL);                 \
   }                                                                            \
                                                                                \

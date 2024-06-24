@@ -18,15 +18,19 @@ void test_increment(void) {
   TEST_ASSERT(SELECT_ID(id_gen) == expected);
 }
 
-void test_modes(void) {
+void test_modes_and_marks(void) {
   gid id_gen = 0;
 
   GID_SET_MODE(id_gen, STORAGE);
+  GID_SET_MODE(id_gen, ALV);
 
   TEST_ASSERT(SELECT_MODE(id_gen) == STORAGE);
 
   GID_SET_MODE(id_gen, CACHED);
+  GID_INCR(id_gen);
 
+  TEST_ASSERT(SELECT_ID(id_gen) == 1);
+  TEST_ASSERT(SELECT_MARK(id_gen) == ALV);
   TEST_ASSERT(SELECT_MODE(id_gen) == CACHED);
 }
 
@@ -53,7 +57,7 @@ int main(void) {
   UNITY_BEGIN();
 
   RUN_TEST(test_increment);
-  RUN_TEST(test_modes);
+  RUN_TEST(test_modes_and_marks);
   RUN_TEST(compound_test);
 
   UNITY_END();

@@ -39,12 +39,19 @@ typedef size_t gsize;
 
 typedef int64_t gint;
 
+
+/* Type representing the iteration structure used to concurrently modify
+   components. */
 typedef struct g_itr g_itr;
 
 /* Since the composite vector knows nothing about the arrangement of data
    inside each element. Its effectively the any vector. The fragments part is
    for flavor for the user. */
 typedef any fragment;
+
+/* Type representing the iteration structure used to concurrently modify
+   components. */
+typedef struct g_itr g_itr;
 
 /* Type representing the interface given to each system. */
 typedef struct g_query_t g_query_t;
@@ -64,6 +71,7 @@ typedef struct archetype archetype;
  *-------------------------------------------------------*/
 VECTOR_GEN_H(bool)
 VECTOR_GEN_H(gid);
+VECTOR_GEN_H(gint);
 VECTOR_GEN_H(fragment);
 
 /*-------------------------------------------------------

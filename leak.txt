@@ -1,0 +1,48 @@
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:163: COMPONENT Vec2d -> 210693278137
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:163: COMPONENT RedColor -> 7571513922450207
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:163: COMPONENT BlueColor -> 249837778465548684
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:163: COMPONENT GreenColor -> 8244886504972484085
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:174: SYSTEM Vec2d -> 0x109250
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:174: SYSTEM RedColor -> 0x109270
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:174: SYSTEM BlueColor -> 0x1092e0
+player is 0
+01:35:36 [33mWARN  [0msrc/structures/vector.c:28: [vectors_intersect]: attempted to compare vectors with different element sizes: 0, 8
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:575: transfering 0 to archetype with type hash: 7575866456520978
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 210693278137
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:582: archetype not found, created id: 2
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:575: transfering 0 to archetype with type hash: 642867730227243003
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 210693278137
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 7571513922450207
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:582: archetype not found, created id: 3
+player pos: {x: 6, y: 9}
+01:35:36 [35mDEBUG [0mdemo/main.c:58: ---WORLD TICK START---
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:303: fsm reprocess triggered
+Entered function!!
+Entered function!!
+Is now red, going to blue!
+01:35:36 [33mWARN  [0msrc/structures/vector.c:28: [vectors_intersect]: attempted to compare vectors with different element sizes: 0, 8
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:575: transfering 5 to archetype with type hash: 7573996313288925
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 249837778465548684
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:582: archetype not found, created id: 3
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:575: transfering 5 to archetype with type hash: 4785106937294793670
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 7571513922450207
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 249837778465548684
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:582: archetype not found, created id: 4
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:575: transfering 5 to archetype with type hash: 7573996313288925
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:575: transfering 0 to archetype with type hash: 2396556639584963027
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 210693278137
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 7571513922450207
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 249837778465548684
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:582: archetype not found, created id: 4
+01:35:36 [35mDEBUG [0mdemo/main.c:60: ---WORLD TICK END---
+01:35:36 [35mDEBUG [0mdemo/main.c:58: ---WORLD TICK START---
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:303: fsm reprocess triggered
+Entered function!!
+Entered function!!
+Is now red, going to blue!
+Entered function!!
+Is now red, going to blue!
+01:35:36 [33mWARN  [0msrc/structures/vector.c:28: [vectors_intersect]: attempted to compare vectors with different element sizes: 0, 8
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:575: transfering 5 to archetype with type hash: 7573996313288925
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:692: collected name hash: 249837778465548684
+01:35:36 [35mDEBUG [0msrc/core/gecs.c:582: archetype not found, created id: 3

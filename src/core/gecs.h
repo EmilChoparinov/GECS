@@ -64,7 +64,9 @@ gid g_create_entity(g_core_t *w);
 gid gq_create_entity(g_query_t *q);
 
 retcode g_queue_delete(g_core_t *w, gid entt);
-retcode gq_queue_delete_entity(g_query_t *q, gid entt);
+retcode gq_queue_delete(g_query_t *q, gid entt);
+
+bool gq_id_in(g_query_t *q, gid id);
 
 #define gq_add(q, id, ty) __gq_add(q, id, #ty)
 retcode __gq_add(g_query_t *q, gid id, char *name);
@@ -78,7 +80,10 @@ retcode __gq_set(g_query_t *q, gid entt_id, char *name, void *comp);
 #define gq_rem(q, id, ty) __gq_rem(q, id, #ty)
 retcode __gq_rem(g_query_t *q, gid entt_id, char *name);
 
-#define gq_collect(q, ...) __gq_collect(q, #__VA_ARGS__)
-g_itr __gq_collect(g_query_t *q, char *query);
+#define gq_take(q, frag, ty) (ty *)(__gq_take(q, frag, #ty))
+fragment *__gq_take(g_query_t *q, fragment *frag, char *name);
+
+#define gq_index(q, i, ty) (ty *)(__gq_index(q, i, #ty))
+fragment *__gq_index(g_query_t *q, gint index, char *name);
 
 #endif

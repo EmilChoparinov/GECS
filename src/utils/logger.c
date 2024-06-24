@@ -12,7 +12,7 @@
 typedef struct log_t log_t;
 struct log_t {
   int         LEVEL, LINE_NUM;
-  const char *FILE, *FORMAT;
+  const char *FILE, *FORMAT, *FUNC;
   va_list     to_print;
 };
 
@@ -30,12 +30,15 @@ int min_level = LOG_TRACE;
  *-------------------------------------------------------*/
 void log_set_level(int LEVEL) { min_level = LEVEL; }
 
-void _cust_log(int LEVEL, const char *FILE, int LINE_NUM, const char *FORMAT,
-               ...) {
+void _cust_log(int LEVEL, const char *FILE, const char *FUNC, int LINE_NUM,
+               const char *FORMAT, ...) {
   if (LEVEL < min_level) return;
 
-  log_t log_instance = {
-      .FILE = FILE, .FORMAT = FORMAT, .LEVEL = LEVEL, .LINE_NUM = LINE_NUM};
+  log_t log_instance = {.FILE = FILE,
+                        .FORMAT = FORMAT,
+                        .FUNC = FUNC,
+                        .LEVEL = LEVEL,
+                        .LINE_NUM = LINE_NUM};
 
   va_start(log_instance.to_print, FORMAT);
   log_to_stdout(&log_instance);
@@ -75,7 +78,7 @@ static void log_to_stdout(log_t *log) {
     break;
   }
 
-  printf("%s:%d: ", log->FILE, log->LINE_NUM);
+  printf("%s:%d [%s]: ", log->FILE, log->LINE_NUM, log->FUNC);
   vfprintf(stdout, log->FORMAT, log->to_print);
   fflush(stdout);
 }
@@ -85,8 +88,8 @@ static void log_to_stdout(log_t *log) {
 /*-------------------------------------------------------
  * DISABLED DEBUGGING FUNCTION IMPLEMENTATIONS
  *-------------------------------------------------------*/
-void _cust_log(int LEVEL, const char *FILE, int LINE_NUM, const char *FORMAT,
-               ...) {}
+void _cust_log(int LEVEL, const char *FILE, const char *FUNC, int LINE_NUM,
+               const char *FORMAT, ...) {}
 
 void log_set_level(void) {}
 #endif

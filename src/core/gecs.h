@@ -29,6 +29,7 @@
 /*-------------------------------------------------------
  * Utilities
  *-------------------------------------------------------*/
+#include "buffer.h" /* Adds API for manipulating memory regions. */
 #include "debug.h"  /* Adds GECS debugging features. */
 #include "logger.h" /* Adds Logging. */
 

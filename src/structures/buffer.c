@@ -32,6 +32,13 @@ retcode buff_push(buff_t *b, void *item, size_t item_size) {
   return R_OKAY;
 }
 
+void *buff_skip(buff_t *b, size_t to_skip) {
+  assert(b);
+  if (to_skip == 0) return b->top;
+  b->top += to_skip;
+  return b->top;
+}
+
 void *buff_pop(buff_t *b, size_t item_size) {
   assert(b);
   assert(item_size > 0);

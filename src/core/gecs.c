@@ -76,7 +76,6 @@ struct g_core_t {
  * Static Forward Declarations
  *-------------------------------------------------------*/
 static retcode _g_init_archetype(g_core_t *w, archetype *a, gid_vec_t *types);
-static void    _g_free_archetype(archetype *a);
 static retcode _g_transfer_archetypes(g_core_t *w, gid entt, gid_vec_t *types);
 static retcode _g_archetype_key(char *types, gid_vec_t *hashes);
 static retcode _g_assign_fsm(g_core_t *w);
@@ -107,26 +106,56 @@ g_core_t *g_create_world(void) {
   system_data_vec_init(&w->system_registry);
 
   /* Curiously, I decided to not put the empty archetype into the registry.
-     Why? I don't want to risk adding an extra collision when querying. This if
+     Why? I don't want to risk adding an extra coll;ision when querying. This if
      ok because the empty archetype represents garbage so a user will never
      query for it. */
 
   return w;
 }
 
-static bool f_free_archetype(gid_archetype_map_item *it, void *arg) {
-  _g_free_archetype(&it->value);
+static retcode _g_destroy_world(g_core_t *w);
+static bool    f_free_archetype(gid_archetype_map_item *it, void *arg) {
+  archetype *a = &it->value;
+  gid_vec_free(&a->type_set);
+  fragment_vec_free(&a->composite);
+  psystem_data_vec_free(&a->contenders);
+
+  gid_gsize_map_free(&a->offsets);
+
+  if (a->cache) _g_destroy_world(a->cache);
+
+  gid_vec_free(&a->entt_delete_queue);
+  gid_vec_free(&a->entt_creation_queue);
+
+  gint_vec_free(&a->dead_fragments);
+
+  gid_gid_map_free(&a->cache_interface);
+  gid_pentity_record_map_free(&a->entt_members);
+
   return true;
 }
-retcode g_destroy_world(g_core_t *w) {
+
+static bool f_free_system_data(system_data *sd, void *arg) {
+  gid_vec_free(&sd->requirements);
+  return true;
+}
+
+static retcode _g_destroy_world(g_core_t *w) {
   gid_gsize_map_free(&w->component_registry);
   gid_entity_record_map_free(&w->entity_registry);
-  gid_archetype_map_foreach(&w->archetype_registry, f_free_archetype, NULL);
+  gid_archetype_map_foreach(&w->archetype_registry, f_free_archetype,
+                            NULL);
+  gid_archetype_map_free(&w->archetype_registry);
 
+  system_data_vec_foreach(&w->system_registry, f_free_system_data, NULL);
   system_data_vec_free(&w->system_registry);
+
+  free(w);
 
   return R_OKAY;
 }
+
+retcode g_destroy_world(g_core_t *w) { return _g_destroy_world(w); }
 
 bool run_sys_process(void **arch, g_core_t *world) {
   archetype *a = *arch;
@@ -154,12 +183,13 @@ retcode g_progress(g_core_t *w) {
   _g_cleanup(w);
   _g_defragment(w);
 
+  any_vec_free(&arch_vec);
+
   return R_OKAY;
 }
 
 retcode g_register_component(g_core_t *w, char *name, size_t component_size) {
   gid hash_name = (gid)hash_bytes(name, strlen(name));
-  log_debug("COMPONENT %s -> %ld\n", name, hash_name);
   return gid_gsize_map_put(&w->component_registry, &hash_name, &component_size);
 }
 
@@ -169,8 +199,6 @@ retcode g_register_system(g_core_t *w, g_system sys, char *query) {
 
   gid_vec_t type_set;
   _g_archetype_key(query, &type_set);
-
-  log_debug("SYSTEM %s -> %p\n", query, sys);
 
   return system_data_vec_push(
       &w->system_registry,
@@ -194,6 +222,7 @@ static retcode type_union(gid_vec_t *a, gid_vec_t *b, gid_vec_t *out) {
   }
 
   gid_gid_map_to_vec(&type_set, (any_vec_t *)out);
+  gid_gid_map_free(&type_set);
   return R_OKAY;
 }
 
@@ -212,10 +241,15 @@ static retcode __g_add_component(g_core_t *w, gid entt_id,
 
   _g_transfer_archetypes(w, entt_id, &archetype_set);
 
+  gid_vec_free(new_types);
+  gid_vec_free(&archetype_set);
+
   return R_OKAY;
 }
 
 retcode g_add_component(g_core_t *w, gid entt_id, char *name) {
+  log_info("add component {id: %ld, name: %s, ctx: %d }\n", entt_id, name,
+           SELECT_MODE(entt_id));
   gid_vec_t new_types;
   _g_archetype_key(name, &new_types);
 
@@ -232,10 +266,16 @@ static void *__g_get_component(g_core_t *w, gid entt_id, gid type) {
   gid_gsize_map_item *typekv = gid_gsize_map_find(&entt_rec.a->offsets, &type);
   assert(typekv && "Component not registered!");
   gsize comp_off = typekv->value;
-  return fragment_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off;
+
+  buff_t buff;
+  buff_init(&buff, fragment_vec_at(&entt_rec.a->composite, entt_rec.index));
+
+  return buff_skip(&buff, comp_off);
 }
 
 void *g_get_component(g_core_t *w, gid entt_id, char *name) {
+  log_info("get component {id: %ld, name: %s, ctx:%d }\n", entt_id, name,
+           SELECT_MODE(entt_id));
   return __g_get_component(w, entt_id, (gid)hash_bytes(name, strlen(name)));
 }
 
@@ -255,13 +295,17 @@ static retcode __g_set_component(g_core_t *w, gid entt_id, gid type,
 
   gsize comp_off = type_item->value;
 
+  buff_t buff;
+  buff_init(&buff, fragment_vec_at(&entt_rec.a->composite, entt_rec.index));
+
   /* Copy data into composite */
-  memmove(fragment_vec_at(&entt_rec.a->composite, entt_rec.index) + comp_off,
-          comp, entt_rec.a->composite.__el_size);
+  memmove(buff_skip(&buff, comp_off), comp, entt_rec.a->composite.__el_size);
   return R_OKAY;
 }
 
 retcode g_set_component(g_core_t *w, gid entt_id, char *name, void *comp) {
+  log_info("set component {id: %ld, name: %s, ctx:%d }\n", entt_id, name,
+           SELECT_MODE(entt_id));
   gid type = (gid)hash_bytes(name, strlen(name));
   return __g_set_component(w, entt_id, type, comp);
 }
@@ -290,7 +334,11 @@ retcode g_rem_component(g_core_t *w, gid entt_id, char *name) {
     if (gid_vec_has(&new_types, cur_type)) gid_vec_delete(&type_set, cur_type);
   }
 
-  return _g_transfer_archetypes(w, entt_id, &type_set);
+  retcode code = _g_transfer_archetypes(w, entt_id, &type_set);
+
+  gid_vec_free(&type_set);
+  gid_vec_free(&new_types);
+  return code;
 }
 
 static bool f_reset_archetypes(gid_archetype_map_item *item, void *arg) {
@@ -299,7 +347,6 @@ static bool f_reset_archetypes(gid_archetype_map_item *item, void *arg) {
 }
 
 static retcode _g_assign_fsm(g_core_t *w) {
-  log_debug("fsm reprocess triggered\n");
   /* Clear the old system positions. */
   gid_archetype_map_foreach(&w->archetype_registry, f_reset_archetypes, NULL);
 
@@ -322,6 +369,7 @@ static retcode _g_assign_fsm(g_core_t *w) {
   }
 
   w->reprocess_fsm = 0; /* Set process flag as complete. */
+  any_vec_free(&archetypes);
 
   return R_OKAY;
 
@@ -343,7 +391,6 @@ static retcode _g_assign_fsm(g_core_t *w) {
 
         if (!gid_vec_has(&arch->type_set, type)) continue;
 
-        log_debug("Assigning %p to %ld\n", sd->run_system, arch->archetype_id);
         psystem_data_vec_push(&arch->contenders, &sd);
         break;
       }
@@ -563,20 +610,6 @@ retcode __gq_rem(g_query_t *q, gid entt, char *name) {
                          &q->archetype_context->type_set);
 
   return g_rem_component(q->archetype_context->cache, entt_cache_id, name);
-  // gid_vec_t type_set;
-  // gid_vec_init(&type_set);
-  // /* Deletion of component via adding the OTHERs to cache instead */
-  // gid type_to_remove = (gid)hash_bytes(name, strlen(name));
-  // for (size_t type_i = 0; type_i < q->archetype_context->type_set.length;
-  //      type_i++) {
-  //   gid *type = gid_vec_at(&q->archetype_context->type_set, type_i);
-  //   if (*type == type_to_remove) continue;
-  //   gid_vec_push(&type_set, type);
-  // }
-  // _g_transfer_archetypes(q->archetype_context->cache, entt_cache_id,
-  // &type_set);
-
-  // return g_rem_component(q->archetype_context->cache, entt_cache_id, name);
 }
 
 fragment *__gq_take(g_query_t *q, fragment *frag, char *name) {
@@ -612,15 +645,11 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
      element set. */
   gid_vec_sort(type_set, asc_gids, NULL);
   gid arch_id = hash_vec((any_vec_t *)type_set);
-  log_debug("transfering %ld to archetype with type hash: %ld\n", entt,
-            arch_id);
 
   /* Check archetype_registry to see if this one exists, if not: make it. */
   if (!gid_archetype_map_has(&w->archetype_registry, &arch_id)) {
-    archetype a;
+    archetype a = {0};
     _g_init_archetype(w, &a, type_set);
-    log_debug("archetype not found, created id: %ld\n", a.archetype_id,
-              arch_id);
     gid_archetype_map_put(&w->archetype_registry, &arch_id, &a);
 
     /* Whenever a new archetype is added to the graph, we must re-schedule
@@ -651,24 +680,22 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
     return R_OKAY;
   }
 
-  /* Update position of entity */
-  item->value.a = a_next;
-  item->value.index = a_next->composite.length;
-
   /* We need to maintain the component data we care about in the segment and
      discard the rest. We do this by collecting the intersection between the new
      and old archetypes. */
+  gint  new_pos = a_next->composite.length;
   void *seg_prev = fragment_vec_at(&a_prev->composite, entt_rec.index);
   fragment_vec_resize(&a_next->composite, a_next->composite.length + 1);
-  void *seg_next = fragment_vec_at(&a_next->composite, entt_rec.index);
+  void *seg_next = fragment_vec_at(&a_next->composite, new_pos);
+
+  /* Update position of entity */
+  item->value.a = a_next;
+  item->value.index = new_pos;
 
   /* Cache update step */
   entity_record *rec = &item->value;
   gid_pentity_record_map_remove(&a_prev->entt_members, &entt);
   gid_pentity_record_map_put(&a_next->entt_members, &entt, &rec);
-
-  gid_vec_t retained_types;
-  gid_vec_init(&retained_types);
 
   // TODO: performance bottleneck, fix in future with sets
   for (size_t i = 0; i < a_prev->type_set.length; i++) {
@@ -690,6 +717,7 @@ static retcode _g_transfer_archetypes(g_core_t *w, gid entt,
   /* Instead of deleting from the composite vector now, we delete at the end
      of the tick as a batch. */
   gint_vec_push(&a_prev->dead_fragments, &index_prev);
+
   return R_OKAY;
 }
 
@@ -698,29 +726,13 @@ static retcode _g_init_archetype(g_core_t *w, archetype *a,
   GID_INCR(w->id_gen);
   a->archetype_id = SELECT_ID(w->id_gen);
 
-  /* Setup caching context members */
-  a->cache = g_create_world();
-  GID_SET_MODE(a->cache->id_gen, CACHED);
-
-  /* If the first thing done in the cache is a translation, it will fail
-     because the 0th id represents empty. The real storage does not have
-     this problem because it's possible to add a component to a non-existent
-     entity. */
-  GID_INCR(a->cache->id_gen);
-
-  gid_gsize_map_free(&a->cache->component_registry);
-  gid_gsize_map_copy(&a->cache->component_registry, &w->component_registry);
-  gint_vec_init(&a->dead_fragments);
-
-  gid_gid_map_init(&a->cache_interface);
+  /* Setup archetype members. */
   gid_pentity_record_map_init(&a->entt_members);
+  psystem_data_vec_init(&a->contenders);
   gid_vec_init(&a->entt_delete_queue);
   gid_vec_init(&a->entt_creation_queue);
-
-  psystem_data_vec_init(&a->contenders);
+  gint_vec_init(&a->dead_fragments);
   gid_gsize_map_init(&a->offsets);
-
-  /* Store it locally */
   gid_vec_copy(gid_vec_init(&a->type_set), type_set);
 
   /* To construct the offset map, we increment and collect the sizes of the
@@ -729,8 +741,6 @@ static retcode _g_init_archetype(g_core_t *w, archetype *a,
   for (int64_t i = 0; i < a->type_set.length; i++) {
     gid *name_hash = gid_vec_at(&a->type_set, i);
     gid_gsize_map_put(&a->offsets, name_hash, &curs);
-
-    log_debug("collected name hash: %ld\n", *name_hash);
 
     gid_gsize_map_item *component_size =
         gid_gsize_map_find(&w->component_registry, name_hash);
@@ -741,14 +751,23 @@ static retcode _g_init_archetype(g_core_t *w, archetype *a,
   /* The length of 1 element in the composite vector is equal to the final size
      of curs. */
   vec_unknown_type_init((any_vec_t *)&a->composite, curs);
-  return R_OKAY;
-}
-static void _g_free_archetype(archetype *a) {
-  gid_vec_free(&a->type_set);
-  vec_unknown_type_free((any_vec_t *)&a->composite);
-  psystem_data_vec_free(&a->contenders);
 
-  gid_gsize_map_free(&a->offsets);
+  /* Caches dont get caches! */
+  if (SELECT_MODE(w->id_gen) == CACHED) return R_OKAY;
+  /* Setup caching context members */
+  a->cache = g_create_world();
+  GID_SET_MODE(a->cache->id_gen, CACHED);
+
+  /* If the first thing done in the cache is a translation, it will fail
+     because the 0th id represents empty. The real storage does not have
+     this problem because it's impossible to add a component to a non-existent
+     entity. */
+  GID_INCR(a->cache->id_gen);
+  gid_gsize_map_free(&a->cache->component_registry);
+  gid_gsize_map_copy(&a->cache->component_registry, &w->component_registry);
+  gid_gid_map_init(&a->cache_interface);
+
+  return R_OKAY;
 }
 
 typedef struct f_consolidate_entity_args f_consolidate_entity_args;
@@ -775,27 +794,21 @@ static bool consolidate_entity(gid_gid_map_item *item, void *arg) {
   entity_record *cache_rec =
       &gid_entity_record_map_find(&cache->entity_registry, &temp_id)->value;
 
-  // void *segment = fragment_vec_at(&cache_rec->a->composite,
-  // cache_rec->index);
-
   // TODO: bottleneck, make this a set
   for (size_t type_i = 0; type_i < cache_rec->a->type_set.length; type_i++) {
     gid *temp_type = gid_vec_at(&cache_rec->a->type_set, type_i);
     if (gid_vec_has(&perm_rec->a->type_set, temp_type)) continue;
 
-    // gsize offset = gid_gsize_map_find(&cache_rec->a->offsets,
-    // temp_type)->value;
     // TODO: add_component supports N amount of types. This is a waste!
     //       when you have time, make it so the offsets get put into a map.
     gid_vec_push(&type_set, temp_type);
     __g_add_component(world, perm_id, &type_set);
     void *seg = __g_get_component(cache, temp_id, *temp_type);
     __g_set_component(world, perm_id, *temp_type, seg);
-    // log_debug("[consolidate entity]: adding %ld with offset %ld", *temp_type,
-    //           offset);
-    // __g_set_component(world, perm_id, *temp_type, segment + offset);
     gid_vec_pop(&type_set);
   }
+
+  gid_vec_free(&type_set);
   return true;
 }
 
@@ -972,13 +985,14 @@ static bool defrag_archetype(gid_archetype_map_item *item, void *arg) {
     fragment_vec_push(&vectorized, segment);
   }
 
+  fragment_vec_free(&a->composite);
+  memmove(&a->composite, &vectorized, sizeof(fragment_vec_t));
+
   gid_pentity_record_map_foreach(&a->entt_members, defrag_entity,
                                  &a->dead_fragments);
 
   return true;
 }
 static void _g_defragment(g_core_t *w) {
-  any_vec_t storage_archetypes;
-  gid_archetype_mmap_to_vec(&w->archetype_registry, &storage_archetypes);
   gid_archetype_map_foreach(&w->archetype_registry, defrag_archetype, w);
 }

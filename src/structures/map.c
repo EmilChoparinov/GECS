@@ -11,6 +11,7 @@ uint64_t hash_bytes(void *ptr, size_t size) {
   for (size_t i = 0; i < size; i++) {
     hash = ((hash << 5) + hash) + b_ptr[i];
   }
+  log_info("hash %s (%ld) -> %ld\n", (char *)ptr, size, hash);
   return hash;
 }
 

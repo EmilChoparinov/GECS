@@ -15,6 +15,14 @@
 #include <string.h>
 #include <time.h>
 
+#ifndef __FUNCTION__
+#ifdef WIN32 // WINDOWS
+#define __FUNCTION_NAME__ __FUNCTION__
+#else //*NIX
+#define __FUNCTION_NAME__ __func__
+#endif
+#endif
+
 /*-------------------------------------------------------
  * ENUMERATION OPTIONS AND COLOR DEFINITIONS
  *-------------------------------------------------------*/
@@ -30,11 +38,16 @@ enum { LOG_TRACE, LOG_INFO, LOG_DEBUG, LOG_WARN, LOG_ERROR };
 /*-------------------------------------------------------
  * LOGGING FUNCTIONS
  *-------------------------------------------------------*/
-#define log_trace(...) _cust_log(LOG_TRACE, __FILE__, __LINE__, __VA_ARGS__);
-#define log_info(...) _cust_log(LOG_INFO, __FILE__, __LINE__, __VA_ARGS__);
-#define log_debug(...) _cust_log(LOG_DEBUG, __FILE__, __LINE__, __VA_ARGS__);
-#define log_warn(...) _cust_log(LOG_WARN, __FILE__, __LINE__, __VA_ARGS__);
-#define log_error(...) _cust_log(LOG_ERROR, __FILE__, __LINE__, __VA_ARGS__);
+#define log_trace(...)                                                         \
+  _cust_log(LOG_TRACE, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
+#define log_info(...)                                                          \
+  _cust_log(LOG_INFO, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
+#define log_debug(...)                                                         \
+  _cust_log(LOG_DEBUG, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
+#define log_warn(...)                                                          \
+  _cust_log(LOG_WARN, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
+#define log_error(...)                                                         \
+  _cust_log(LOG_ERROR, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
 
 /**
  * @brief Set the logging level. All levels below this level will be ignored
@@ -47,6 +60,7 @@ void log_set_level(int LEVEL);
 /*-------------------------------------------------------
  * PRIVATE FUNCTIONS
  *-------------------------------------------------------*/
-void _cust_log(int LEVEL, const char *FILE, int LINE_NUM, const char *FORMAT, ...);
+void _cust_log(int LEVEL, const char *FILE, const char *FUNC, int LINE_NUM,
+               const char *FORMAT, ...);
 
 #endif

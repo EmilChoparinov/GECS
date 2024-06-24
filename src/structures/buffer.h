@@ -49,5 +49,6 @@ void buff_hfree(buff_t *b);
 retcode buff_push(buff_t *b, void *item, size_t item_size);
 void   *buff_pop(buff_t *b, size_t item_size);
 void   *buff_at(buff_t *b, int idx);
+void   *buff_skip(buff_t *b, size_t to_skip);
 
 #endif

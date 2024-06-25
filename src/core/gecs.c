@@ -2,23 +2,25 @@
 
 #include "gecs.h"
 
+/*-------------------------------------------------------
+ * Local Types & Generation
+ *-------------------------------------------------------*/
 typedef struct entity_record entity_record;
 typedef entity_record       *pentity_record;
 typedef struct system_data   system_data;
 typedef system_data         *psystem_data;
-struct system_data {
-  g_system  run_system;   /* A function pointer to the system. */
-  gid_vec_t requirements; /* String of components in the form "A,B,C". */
-};
-VECTOR_GEN_H(system_data);
-VECTOR_GEN_C(system_data);
-
-VECTOR_GEN_H(psystem_data);
-VECTOR_GEN_C(psystem_data);
 
 MAP_GEN_H(gid, pentity_record);
 MAP_GEN_C(gid, pentity_record);
 
+VECTOR_GEN_H(system_data);
+
+VECTOR_GEN_H(psystem_data);
+VECTOR_GEN_C(psystem_data);
+
+/*-------------------------------------------------------
+ * GECS Structures
+ *-------------------------------------------------------*/
 struct archetype {
   gid archetype_id; /* Unique Identifier for this archetype. */
 
@@ -40,19 +42,23 @@ struct archetype {
 MAP_GEN_H(gid, archetype);
 MAP_GEN_C(gid, archetype);
 
+struct g_vec {
+  fragment_vec_t  *stored_components;
+  gid_gsize_map_t *offsets;
+};
+
+struct system_data {
+  g_system  run_system;   /* A function pointer to the system. */
+  gid_vec_t requirements; /* String of components in the form "A,B,C". */
+};
+VECTOR_GEN_C(system_data);
+
 struct entity_record {
   archetype *a;     /* The archetype this entity belongs to. */
   gint       index; /* The index to collect their components. */
 };
-
 MAP_GEN_H(gid, entity_record);
 MAP_GEN_C(gid, entity_record);
-
-struct g_query_t {
-  g_core_t  *world;                /* The world being queried on. */
-  archetype *archetype_context;    /* Which archetype this querys context is. */
-  fragment_vec_t *component_store; /* Pointer to composite */
-};
 
 struct g_core_t {
   gid    id_gen;        /* Generates unique IDs */
@@ -77,6 +83,12 @@ struct g_core_t {
 struct g_itr {
   gint   idx;
   g_vec *vec;
+};
+
+struct g_query_t {
+  g_core_t  *world;                /* The world being queried on. */
+  archetype *archetype_context;    /* Which archetype this querys context is. */
+  fragment_vec_t *component_store; /* Pointer to composite */
 };
 
 /*-------------------------------------------------------

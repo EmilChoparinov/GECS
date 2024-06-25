@@ -72,11 +72,8 @@ void is_blue(g_query_t *q) {
 
 void subtract_vec2d_once(g_itr *itr, void *arg) {
   Vec2d *coords = gq_field(itr, Vec2d);
-  Vec2d  old = *coords;
   coords->x--;
   coords->y--;
-  log_error("Subtracting from {x: %d, y: %d} -> {x: %d, y: %d}\n", old.x, old.y,
-            coords->x, coords->y);
 }
 
 void update_falling_entities(g_query_t *q) {
@@ -97,17 +94,16 @@ int main(void) {
   G_SYSTEM(world, add_ones, Vec2d);
   G_SYSTEM(world, is_red, RedColor);
   G_SYSTEM(world, is_blue, BlueColor);
-  // G_SYSTEM(world, update_falling_entities, Vec2d, Fall);
+  G_SYSTEM(world, update_falling_entities, Vec2d, Fall);
 
   player = g_create_entity(world);
   opponent = g_create_entity(world);
 
-  /* Generate 1000 entities for falling calc tests */
-  for (int i = 0; i < 1000; i++) {
+  /* Generate 50000 entities for falling calc tests */
+  for (int i = 0; i < 5000; i++) {
     gid entt = g_create_entity(world);
     G_ADD_COMPONENT(world, entt, Vec2d);
     G_ADD_COMPONENT(world, entt, Fall);
-    G_SET_COMPONENT(world, entt, Fall, {.x = 0});
     G_SET_COMPONENT(world, entt, Vec2d, {.x = 100, .y = 100});
   }
 
@@ -124,7 +120,7 @@ int main(void) {
   Vec2d *playerPos = G_GET_COMPONENT(world, player, Vec2d);
   printf("player pos: {x: %d, y: %d}\n", playerPos->x, playerPos->y);
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 1; i++) {
     g_progress(world);
   }
 

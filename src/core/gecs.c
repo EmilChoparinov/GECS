@@ -161,8 +161,8 @@ static bool    f_free_archetype(gid_archetype_map_item *it, void *arg) {
 
   gint_vec_free(&a->dead_fragments);
 
-  // Sub worlds do not have this allocated. 
-  if(a->cache)  gid_gid_map_free(&a->cache_interface);
+  // Sub worlds do not have this allocated.
+  if (a->cache) gid_gid_map_free(&a->cache_interface);
   gid_pentity_record_map_free(&a->entt_members);
 
   return true;
@@ -713,11 +713,21 @@ retcode __gq_rem(g_query_t *q, gid entt, char *name) {
   return g_rem_component(q->archetype_context->cache, entt_cache_id, name);
 }
 
-g_vec __gq_vectorize(g_query_t *q) {
+g_vec gq_vectorize(g_query_t *q) {
   g_vec itr = {0};
   itr.offsets = &q->archetype_context->offsets;
   itr.stored_components = &q->archetype_context->composite;
   return itr;
+}
+
+g_itr gq_next(g_itr itr) {
+  assert(itr.idx < itr.vec->stored_components->length);
+  itr.idx++;
+  return itr;
+}
+
+bool gq_done(g_itr itr) {
+  return itr.idx == itr.vec->stored_components->length;
 }
 
 typedef struct _g_process_composite_between_f _g_process_composite_between_f;

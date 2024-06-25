@@ -88,8 +88,11 @@ retcode __gq_set(g_query_t *q, gid entt_id, char *name, void *comp);
 #define gq_rem(q, id, ty) __gq_rem(q, id, #ty)
 retcode __gq_rem(g_query_t *q, gid entt_id, char *name);
 
-#define gq_vectorize(q) __gq_vectorize(q)
-g_vec __gq_vectorize(g_query_t *q);
+g_vec gq_vectorize(g_query_t *q);
+g_itr gq_seq(g_query_t *q);
+
+g_itr gq_next(g_itr itr);
+bool gq_done(g_itr itr);
 
 #define gq_each(itr, func, args) __gq_each(itr, (f_each)func, (void *)args);
 void __gq_each(g_vec vec, f_each func, void *args);

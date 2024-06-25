@@ -18,13 +18,11 @@ gid       player, opponent;
 g_core_t *world;
 
 void add_ones(g_query_t *q) {
-  log_error("START ADD ONES\n");
   printf("Entered function!! tid: %lu\n", (uint64_t)pthread_self());
 }
 
 int  red_itrs = 0;
 void is_red(g_query_t *q) {
-  log_error("START RED\n");
   printf("Entering red [%d] tid: %lu\n", red_itrs, (uint64_t)pthread_self());
 
   gid ctx;
@@ -51,7 +49,6 @@ void is_red(g_query_t *q) {
 
 int  blue_itrs = 0;
 void is_blue(g_query_t *q) {
-  log_error("START BLUE\n");
   printf("Entering blue [%d] tid: %lu \n", blue_itrs, (uint64_t)pthread_self());
   gid ctx;
   if (gq_id_in(q, player)) {

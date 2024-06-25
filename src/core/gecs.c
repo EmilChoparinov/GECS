@@ -201,7 +201,7 @@ retcode g_progress(g_core_t *w) {
     args[0] = any_vec_at(&arch_vec, i);
     args[1] = w;
 
-    // any_vec_push(&arg_list, &args); 
+    any_vec_push(&arg_list, of_any(args));
     /* If the composite is empty, then there are no entities here therefore do
        not run the system */
     if ((*(archetype **)any_vec_at(&arch_vec, i))->composite.length == 0) {
@@ -210,11 +210,7 @@ retcode g_progress(g_core_t *w) {
     }
     log_trace("started thread id: %ld\n", i);
     pthread_create(&threads[i], NULL, init_thread, args);
-
-    // run_sys_process(any_vec_at(&arch_vec, i), w);
   };
-
-
 
   for (size_t i = 0; i < arch_vec.length; i++) {
     log_debug("waiting for thread %ld to finish\n", i);
@@ -229,7 +225,10 @@ retcode g_progress(g_core_t *w) {
   _g_cleanup(w);
   _g_defragment(w);
 
+  for (size_t i = 0; i < arg_list.length; i++) free(*any_vec_at(&arg_list, i));
+
   free(threads);
+  any_vec_free(&arg_list);
   any_vec_free(&arch_vec);
 
   log_debug("--- WORLD TICK END\n");

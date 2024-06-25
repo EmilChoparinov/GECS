@@ -9,6 +9,7 @@ struct RedColor {
 
 typedef RedColor     BlueColor; /* We only care about types in this demo */
 typedef RedColor     GreenColor;
+typedef RedColor     Fall;
 typedef struct Vec2d Vec2d;
 struct Vec2d {
   int x, y;
@@ -69,21 +70,46 @@ void is_blue(g_query_t *q) {
   blue_itrs++;
 }
 
+void subtract_vec2d_once(g_itr *itr, void *arg) {
+  Vec2d *coords = gq_field(itr, Vec2d);
+  Vec2d  old = *coords;
+  coords->x--;
+  coords->y--;
+  log_error("Subtracting from {x: %d, y: %d} -> {x: %d, y: %d}\n", old.x, old.y,
+            coords->x, coords->y);
+}
+
+void update_falling_entities(g_query_t *q) {
+  g_vec vec = gq_vectorize(q);
+  gq_each(vec, subtract_vec2d_once, NULL);
+}
+
 int main(void) {
-  log_set_level(LOG_WARN);
+  log_set_level(LOG_ERROR);
   world = g_create_world();
 
   G_COMPONENT(world, Vec2d);
   G_COMPONENT(world, RedColor);
   G_COMPONENT(world, BlueColor);
   G_COMPONENT(world, GreenColor);
+  G_COMPONENT(world, Fall);
 
   G_SYSTEM(world, add_ones, Vec2d);
   G_SYSTEM(world, is_red, RedColor);
   G_SYSTEM(world, is_blue, BlueColor);
+  // G_SYSTEM(world, update_falling_entities, Vec2d, Fall);
 
   player = g_create_entity(world);
   opponent = g_create_entity(world);
+
+  /* Generate 1000 entities for falling calc tests */
+  for (int i = 0; i < 1000; i++) {
+    gid entt = g_create_entity(world);
+    G_ADD_COMPONENT(world, entt, Vec2d);
+    G_ADD_COMPONENT(world, entt, Fall);
+    G_SET_COMPONENT(world, entt, Fall, {.x = 0});
+    G_SET_COMPONENT(world, entt, Vec2d, {.x = 100, .y = 100});
+  }
 
   printf("player is %ld\n", player);
 

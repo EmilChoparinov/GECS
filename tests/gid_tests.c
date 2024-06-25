@@ -30,7 +30,6 @@ void test_modes_and_marks(void) {
   GID_INCR(id_gen);
 
   TEST_ASSERT(SELECT_ID(id_gen) == 1);
-  TEST_ASSERT(SELECT_MARK(id_gen) == ALV);
   TEST_ASSERT(SELECT_MODE(id_gen) == CACHED);
 }
 

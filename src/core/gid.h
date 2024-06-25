@@ -18,7 +18,7 @@
   id = ((((gid)(SELECT_ID(id)) + 1) << 1) | (SELECT_MODE(id)))
 
 #define GID_SET_MODE(id, mode)                                                 \
-  id = ((((gid)(SELECT_ID(id))) << 1) | SELECT_MODE(id))
+  id = ((((gid)(SELECT_ID(id))) << 1) | SELECT_MODE(mode))
 
 // #define SELECT_FLAGS(id) (int32_t)(id & 0x00000000FFFFFFFF)
 // #define SELECT_TAGS(id)  (uint32_t)((id & 0x00000000FFFFFFFE) >> 1)

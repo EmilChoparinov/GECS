@@ -118,7 +118,7 @@ typedef void *any;
   }                                                                            \
                                                                                \
   ret(vector_t(T) *) fname(T, vec_heap_init)(void) {                           \
-    vector_t(T) *v = malloc(sizeof(*v));                                       \
+    vector_t(T) *v = calloc(1, sizeof(*v));                                    \
     assert(v);                                                                 \
                                                                                \
     fname(T, vec_init)(v);                                                     \
@@ -238,7 +238,7 @@ typedef void *any;
     if (dest->length == 0) return R_OKAY;                                      \
                                                                                \
     /* Copy array into new dest*/                                              \
-    dest->element_head = malloc(src->__size * src->__el_size);                 \
+    dest->element_head = calloc(1, src->__size * src->__el_size);              \
     memmove(dest->element_head, src->element_head,                             \
             src->__size * src->__el_size);                                     \
     return R_OKAY;                                                             \
@@ -248,6 +248,7 @@ typedef void *any;
     fname(T, assert_init_checks)(v);                                           \
     v->length = 0;                                                             \
     v->__top = 0;                                                              \
+    memset(v->element_head, 0, v->__size * v->__el_size);                      \
     return R_OKAY;                                                             \
   }                                                                            \
   ret(retcode)                                                                 \

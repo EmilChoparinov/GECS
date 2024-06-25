@@ -38,9 +38,10 @@ VECTOR_GEN_H(m_bool);
 #define map_item_t(Ta, Tb)     Ta##_##Tb##_map_item
 #define map_func(Ta, Tb, func) func(Ta##_##Tb)
 
-#define ffname(Ta, Tb, name)     fname(Ta##_##Tb, name)
-#define map_vec_t(Ta, Tb)        Ta##_##Tb##_map_item_vec_t
-#define map_access(Ta, Tb, func) Ta##_##Tb##_map_item_vec_##func
+#define ffname(Ta, Tb, name)      fname(Ta##_##Tb, name)
+#define map_vec_t(Ta, Tb)         Ta##_##Tb##_map_item_vec_t
+#define map_access(Ta, Tb, func)  Ta##_##Tb##_map_item_vec_##func
+#define map_on_func(Ta, Tb, func) Ta##_##Tb##_map_on_##func
 
 /* Used to zero out map. */
 m_bool m_bool_set_to_true(m_bool b, void *arg);
@@ -49,7 +50,8 @@ m_bool m_bool_set_to_true(m_bool b, void *arg);
    * Define Datastructures                                                     \
    *-------------------------------------------------------*/                  \
   typedef struct map_t(Ta, Tb) map_t(Ta, Tb);                                  \
-  typedef struct map_item_t(Ta, Tb) map_item_t(Ta, Tb);
+  typedef struct map_item_t(Ta, Tb) map_item_t(Ta, Tb);                        \
+  typedef void (*map_on_func(Ta, Tb, uresize))(map_t(Ta, Tb) * m, void *arg);
 
 #define MAP_GEN_H(Ta, Tb)                                                        \
   MAP_GEN_FORWARD(Ta, Tb)                                                        \
@@ -65,6 +67,8 @@ m_bool m_bool_set_to_true(m_bool b, void *arg);
     int64_t      slots_in_use; /* The count of elements in the map. */           \
     m_bool_vec_t is_idx_open;                                                    \
     map_vec_t(Ta, Tb) map;                                                       \
+    map_on_func(Ta, Tb, uresize) resize_f;                                       \
+    void *resize_args;                                                           \
   };                                                                             \
                                                                                  \
   /*-------------------------------------------------------                      \
@@ -78,6 +82,8 @@ m_bool m_bool_set_to_true(m_bool b, void *arg);
    *-------------------------------------------------------*/                    \
   fdecl(map_t(Ta, Tb) *, map_pair(Ta, Tb), map_init, (map_t(Ta, Tb) * m));       \
   fdecl(void, map_pair(Ta, Tb), map_free, (map_t(Ta, Tb) * m));                  \
+  fdecl(void, map_pair(Ta, Tb), map_on_resize,                                   \
+        (map_t(Ta, Tb) * m, map_on_func(Ta, Tb, uresize) r, void *arg));         \
   fdecl(void, map_pair(Ta, Tb), map_clear, (map_t(Ta, Tb) * m));                 \
   fdecl(map_t(Ta, Tb) *, map_pair(Ta, Tb), map_heap_init, (void));               \
   fdecl(void, map_pair(Ta, Tb), map_heap_free, (map_t(Ta, Tb) * m));             \
@@ -131,12 +137,13 @@ m_bool m_bool_set_to_true(m_bool b, void *arg);
   ret(map_t(Ta, Tb) *) ffname(Ta, Tb, map_init)(map_t(Ta, Tb) * m) {           \
     m->__size = MAP_DEFAULT_SIZE;                                              \
     m->slots_in_use = 0;                                                       \
+    m->resize_f = NULL;                                                        \
                                                                                \
-    map_access(Ta, Tb, init)(&m->map);                                         \
-    map_access(Ta, Tb, resize)(&m->map, m->__size);                            \
+    assert(map_access(Ta, Tb, init)(&m->map) != NULL);                         \
+    assert(map_access(Ta, Tb, resize)(&m->map, m->__size) == R_OKAY);          \
                                                                                \
-    m_bool_vec_init(&m->is_idx_open);                                          \
-    m_bool_vec_resize(&m->is_idx_open, m->__size);                             \
+    assert(m_bool_vec_init(&m->is_idx_open) != NULL);                          \
+    assert(m_bool_vec_resize(&m->is_idx_open, m->__size) == R_OKAY);           \
     m_bool_vec_map(&m->is_idx_open, m_bool_set_to_true, NULL);                 \
                                                                                \
     return m;                                                                  \
@@ -147,13 +154,18 @@ m_bool m_bool_set_to_true(m_bool b, void *arg);
     ffname(Ta, Tb, map_assert_init)(src);                                      \
     memmove(dst, src, sizeof(*src));                                           \
                                                                                \
-    m_bool_vec_init(&dst->is_idx_open);                                        \
-    map_access(Ta, Tb, init)(&dst->map);                                       \
-    m_bool_vec_copy(&dst->is_idx_open, &src->is_idx_open);                     \
-    map_access(Ta, Tb, copy)(&dst->map, &src->map);                            \
+    assert(m_bool_vec_init(&dst->is_idx_open) != NULL);                        \
+    assert(map_access(Ta, Tb, init)(&dst->map) != NULL);                       \
+    assert(m_bool_vec_copy(&dst->is_idx_open, &src->is_idx_open) == R_OKAY);   \
+    assert(map_access(Ta, Tb, copy)(&dst->map, &src->map) == R_OKAY);          \
     return dst;                                                                \
   }                                                                            \
                                                                                \
+  ret(void) ffname(Ta, Tb, map_on_resize)(                                     \
+      map_t(Ta, Tb) * m, map_on_func(Ta, Tb, uresize) r, void *arg) {          \
+    m->resize_f = r;                                                           \
+    m->resize_args = arg;                                                      \
+  }                                                                            \
   ret(void) ffname(Ta, Tb, map_free)(map_t(Ta, Tb) * m) {                      \
     ffname(Ta, Tb, map_assert_init)(m);                                        \
                                                                                \
@@ -165,19 +177,20 @@ m_bool m_bool_set_to_true(m_bool b, void *arg);
     map_t(Ta, Tb) *m = malloc(sizeof(*m));                                     \
     assert(m);                                                                 \
                                                                                \
-    ffname(Ta, Tb, map_init)(m);                                               \
+    assert(ffname(Ta, Tb, map_init)(m) != NULL);                               \
                                                                                \
     return m;                                                                  \
   }                                                                            \
                                                                                \
   ret(void) ffname(Ta, Tb, map_clear)(map_t(Ta, Tb) * m) {                     \
     m->slots_in_use = 0;                                                       \
-    map_access(Ta, Tb, clear)(&m->map);                                        \
+    assert(map_access(Ta, Tb, clear)(&m->map) == R_OKAY);                      \
     map_access(Ta, Tb, resize)(&m->map, m->__size);                            \
                                                                                \
     m_bool_vec_clear(&m->is_idx_open);                                         \
     m_bool_vec_resize(&m->is_idx_open, m->__size);                             \
     m_bool_vec_map(&m->is_idx_open, m_bool_set_to_true, NULL);                 \
+    if (m->resize_f != NULL) m->resize_f(m, m->resize_args);                   \
   }                                                                            \
                                                                                \
   ret(void) ffname(Ta, Tb, map_heap_free)(map_t(Ta, Tb) * m) {                 \
@@ -390,23 +403,21 @@ m_bool m_bool_set_to_true(m_bool b, void *arg);
                                                                                \
     /* Create a temporary map container to move all elements into */           \
     map_t(Ta, Tb) double_map;                                                  \
-    ffname(Ta, Tb, map_init)(&double_map);                                     \
+    assert(ffname(Ta, Tb, map_init)(&double_map) != R_OKAY);                   \
                                                                                \
     double_map.__size = m->__size * 2;                                         \
     m_bool_vec_resize(&double_map.is_idx_open, double_map.__size);             \
     map_access(Ta, Tb, resize)(&double_map.map, double_map.__size);            \
     m_bool_vec_map(&double_map.is_idx_open, m_bool_set_to_true, NULL);         \
-                                                                               \
     for (int64_t slot_idx = 0; slot_idx < m->is_idx_open.length; slot_idx++) { \
       if (!*m_bool_vec_at(&m->is_idx_open, slot_idx)) {                        \
         map_item_t(Ta, Tb) *it = map_access(Ta, Tb, at)(&m->map, slot_idx);    \
         ffname(Ta, Tb, map_put)(&double_map, &it->key, &it->value);            \
       }                                                                        \
     }                                                                          \
-                                                                               \
-    /* Overwrite the memory at address m with the local container memory */    \
     ffname(Ta, Tb, map_free)(m);                                               \
     memmove(m, &double_map, sizeof(double_map));                               \
+    if (m->resize_f != ((void *)0)) m->resize_f(m, m->resize_args);            \
   }                                                                            \
                                                                                \
   static ret(int64_t) ffname(Ta, Tb, key_loc)(map_t(Ta, Tb) * m, Ta * key) {   \

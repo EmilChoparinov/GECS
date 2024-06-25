@@ -33,6 +33,13 @@
 #include "debug.h"  /* Adds GECS debugging features. */
 #include "logger.h" /* Adds Logging. */
 
+struct g_vec {
+  fragment_vec_t  *stored_components;
+  gid_gsize_map_t *offsets;
+};
+
+typedef void (*f_each)(g_itr *itr, void *);
+
 /*-------------------------------------------------------
  * Core Functions
  *-------------------------------------------------------*/
@@ -81,11 +88,14 @@ retcode __gq_set(g_query_t *q, gid entt_id, char *name, void *comp);
 #define gq_rem(q, id, ty) __gq_rem(q, id, #ty)
 retcode __gq_rem(g_query_t *q, gid entt_id, char *name);
 
-#define gq_vectorize(q) __gq_select(q)
-g_itr __gq_vectorize(g_query_t *q);
+#define gq_vectorize(q) __gq_vectorize(q)
+g_vec __gq_vectorize(g_query_t *q);
 
-#define gq_field(itr, ty, idx) (ty)(__gq_field(itr, #ty, idx))
-void *__gq_field(g_itr *itr, char *type, gint idx);
+#define gq_each(itr, func, args) __gq_each(itr, (f_each)func, (void *)args);
+void __gq_each(g_vec vec, f_each func, void *args);
+
+#define gq_field(itr, ty) (ty*)(__gq_field(itr, #ty))
+void *__gq_field(g_itr *itr, char *type);
 
 #define gq_take(q, frag, ty) (ty *)(__gq_take(q, frag, #ty))
 fragment *__gq_take(g_query_t *q, fragment *frag, char *name);

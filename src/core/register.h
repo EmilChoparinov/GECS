@@ -52,6 +52,7 @@ typedef any fragment;
 /* Type representing the iteration structure used to concurrently modify
    components. */
 typedef struct g_itr g_itr;
+typedef struct g_vec g_vec;
 
 /* Type representing the interface given to each system. */
 typedef struct g_query_t g_query_t;

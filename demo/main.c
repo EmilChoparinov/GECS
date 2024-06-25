@@ -101,7 +101,7 @@ int main(void) {
   Vec2d *playerPos = G_GET_COMPONENT(world, player, Vec2d);
   printf("player pos: {x: %d, y: %d}\n", playerPos->x, playerPos->y);
 
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 3; i++) {
     g_progress(world);
   }
 

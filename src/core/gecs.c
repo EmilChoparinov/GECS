@@ -192,15 +192,19 @@ retcode g_progress(g_core_t *w) {
   gid_archetype_map_ptrs(&w->archetype_registry, &arch_vec);
 
   pthread_t *threads = malloc(arch_vec.length * sizeof(pthread_t));
-  void     **args = malloc(2 * sizeof(void *));
+
+  any_vec_t arg_list;
+  vec_unknown_type_init(&arg_list, sizeof(void *));
 
   for (size_t i = 0; i < arch_vec.length; i++) {
+    void **args = malloc(2 * sizeof(void *));
     args[0] = any_vec_at(&arch_vec, i);
     args[1] = w;
 
+    // any_vec_push(&arg_list, &args); 
     /* If the composite is empty, then there are no entities here therefore do
        not run the system */
-    if ((*(archetype**)any_vec_at(&arch_vec, i))->composite.length == 0) {
+    if ((*(archetype **)any_vec_at(&arch_vec, i))->composite.length == 0) {
       log_warn("Archetype %ld skipped since it contains no entities\n",
                ((archetype *)args[0])->archetype_id);
     }
@@ -209,6 +213,8 @@ retcode g_progress(g_core_t *w) {
 
     // run_sys_process(any_vec_at(&arch_vec, i), w);
   };
+
+
 
   for (size_t i = 0; i < arch_vec.length; i++) {
     log_debug("waiting for thread %ld to finish\n", i);
@@ -223,7 +229,6 @@ retcode g_progress(g_core_t *w) {
   _g_cleanup(w);
   _g_defragment(w);
 
-  free(args);
   free(threads);
   any_vec_free(&arch_vec);
 

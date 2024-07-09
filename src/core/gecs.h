@@ -31,6 +31,11 @@
 #include "buffer.h" /* Adds API for manipulating memory regions. */
 #include "debug.h"  /* Adds GECS debugging features. */
 #include "logger.h" /* Adds Logging. */
+struct g_vec {
+  fragment_vec_t  *stored_components;
+  gid_gsize_map_t *offsets;
+};
+
 
 /*-------------------------------------------------------
  * World Functions

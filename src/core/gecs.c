@@ -42,11 +42,6 @@ struct archetype {
 MAP_GEN_H(gid, archetype);
 MAP_GEN_C(gid, archetype);
 
-struct g_vec {
-  fragment_vec_t  *stored_components;
-  gid_gsize_map_t *offsets;
-};
-
 struct system_data {
   g_system  run_system;   /* A function pointer to the system. */
   gid_vec_t requirements; /* String of components in the form "A,B,C". */

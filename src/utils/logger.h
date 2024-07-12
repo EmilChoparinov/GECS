@@ -38,6 +38,7 @@ enum { LOG_TRACE, LOG_INFO, LOG_DEBUG, LOG_WARN, LOG_ERROR };
 /*-------------------------------------------------------
  * LOGGING FUNCTIONS
  *-------------------------------------------------------*/
+#ifdef _DEBUG
 #define log_trace(...)                                                         \
   _cust_log(LOG_TRACE, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
 #define log_info(...)                                                          \
@@ -48,6 +49,22 @@ enum { LOG_TRACE, LOG_INFO, LOG_DEBUG, LOG_WARN, LOG_ERROR };
   _cust_log(LOG_WARN, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
 #define log_error(...)                                                         \
   _cust_log(LOG_ERROR, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
+
+#define log_enter log_info("entered")
+#define log_leave log_info("exited")
+#endif
+
+/* Deactivate macros */
+#ifndef _DEBUG
+#define log_trace(...)
+#define log_info(...)
+#define log_debuf(...)
+#define log_warn(...)
+#define log_error(...)
+
+#define log_enter
+#define log_leave
+#endif
 
 /**
  * @brief Set the logging level. All levels below this level will be ignored

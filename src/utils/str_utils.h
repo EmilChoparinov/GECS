@@ -10,15 +10,12 @@
 #ifndef _HEADER_STR_UTILS_H__
 #define _HEADER_STR_UTILS_H__
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
-/* Function that takes a string < 256 bytes long and chunks it into a 256 byte
-   segment. Throws an assertion if given a string longer than 256. The remainder
-   of the string is 0'd out. */
-char *fix_str_256(char * str);
+#include "csdsa.h"
 
-void memswap(void *a, void *b, size_t size);
+uint64_t hash_vector(vec *v);
 
 #endif

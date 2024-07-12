@@ -65,13 +65,13 @@ static void log_to_stdout(log_t *log) {
     printf(GRN "TRACE " RST);
     break;
   case LOG_INFO:
-    printf(BLU "INFO  " RST);
+    printf(BLU "INFO " RST);
     break;
   case LOG_DEBUG:
     printf(MAG "DEBUG " RST);
     break;
   case LOG_WARN:
-    printf(YEL "WARN  " RST);
+    printf(YEL "WARN " RST);
     break;
   case LOG_ERROR:
     printf(RED "ERROR " RST);
@@ -80,16 +80,7 @@ static void log_to_stdout(log_t *log) {
 
   printf("%s:%d [%s]: ", log->FILE, log->LINE_NUM, log->FUNC);
   vfprintf(stdout, log->FORMAT, log->to_print);
+  printf("\n");
   fflush(stdout);
 }
-#endif
-
-#ifndef _DEBUG
-/*-------------------------------------------------------
- * DISABLED DEBUGGING FUNCTION IMPLEMENTATIONS
- *-------------------------------------------------------*/
-void _cust_log(int LEVEL, const char *FILE, const char *FUNC, int LINE_NUM,
-               const char *FORMAT, ...) {}
-
-void log_set_level(void) {}
 #endif

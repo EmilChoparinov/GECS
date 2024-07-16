@@ -5,6 +5,7 @@ demo/gecs/**
 libgecs.a
 libgecs.zip
 extra/**
+dist/**
 
 ### C ###
 # Prerequisites

@@ -33,6 +33,7 @@
 #	  - The name of the output file.
 PROCESS = $(DEMO_FILE_NAME)
 BUILD_FILE_NAME = libgecs
+PKG_DIR = dist
 LIBS = 
 
 #------------------------------------------------------------------------------#
@@ -90,7 +91,7 @@ CC = clang
 EXT = .c
 EXT_HDR = .h
 EXT_ARCHIVE = .a
-CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG $(INC_DIR)
+CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG
 BENCHFLAGS = -pg
 TESTFLAGS = -DUNITY_OUTPUT_COLOR
 BUILDFLAGS = -D_DEBUG
@@ -156,6 +157,7 @@ notif:
 
 $(BUILD_FILE_NAME): $(OBJ_FILES)
 	@echo Bundling...
+	@echo $(ARC_FILES)
 	@for libfile in $(ARC_FILES) ; do ar x $$libfile ; done
 	ar cr $(BUILD_LIB_FILE) *.o $^
 	rm *.o
@@ -164,19 +166,22 @@ $(BUILD_FILE_NAME): $(OBJ_FILES)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%$(EXT)
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) -o $@ -c $<
 
 $(OBJ_DIR)/tests/libs/%.o: $(LIBS_DIR)/%$(EXT)
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) -o $@ -c $<
 
 #------------------------------------------------------------------------------#
 # MAKE PKG                                                                     #
 #------------------------------------------------------------------------------#
 pkg: all 
 	@echo "Packaging..."
-	zip -j $(PACKG_ZIP_FILE) $(INC_FILES) $(BUILD_LIB_FILE)
+	@mkdir $(PKG_DIR) || true
+	@for header in $(INC_FILES); do cp $$header $(PKG_DIR); done
+	@cp $(BUILD_LIB_FILE) $(PKG_DIR)
+	@echo "Done!"
 
 #------------------------------------------------------------------------------#
 # MAKE TEST                                                                    #
@@ -193,16 +198,16 @@ test: $(BUILD_FILE_NAME) build_unity $(TST_BINS_DIR) $(TST_BINS) $(TST_OBJ_DIR)
 	@./$(PROCESS) --verbose && echo
 
 build_unity:
-	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $(UNITY_FILE_NAME).o -c $(UNITY_FILES)
+	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) -o $(UNITY_FILE_NAME).o -c $(UNITY_FILES)
 
 $(TST_OBJ_DIR)/%.o: $(TST_DIR)%.c
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ $< $(UNITY_FILE_NAME).o $(BUILD_LIB_FILE)
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) -o $@ $< $(UNITY_FILE_NAME).o $(BUILD_LIB_FILE)
 
 $(TST_BINS_DIR)/%: $(TST_DIR)/%.c
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(TST_INC) $(TESTFLAGS) $< $(UNITY_FILE_NAME).o $(LIB_TST_FILES) $(BUILD_LIB_FILE) -o $@
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) $(TST_INC) $(TESTFLAGS) $< $(UNITY_FILE_NAME).o $(LIB_TST_FILES) $(BUILD_LIB_FILE) -o $@
 
 $(TST_BINS_DIR):
 	@mkdir $@
@@ -213,17 +218,12 @@ $(TST_OBJ_DIR):
 #------------------------------------------------------------------------------#
 # MAKE EXEC                                                                    #
 #------------------------------------------------------------------------------#
-exec: $(DEM_DIR) copy_build_to_demo
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(DEM_INC) $(DEM_FILES) ./demo/libgecs/libgecs.a -o $(DEMO_FILE_NAME)
+exec: pkg $(DEM_DIR)
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(DEM_INC) -I./$(PKG_DIR)/ $(DEM_FILES) $(wildcard $(PKG_DIR)/*.a) -o $(DEMO_FILE_NAME)
 
 $(DEM_DIR):
 	@echo in DEM_DIR
 	@mkdir $@
-
-copy_build_to_demo: pkg
-	cp $(PACKG_ZIP_FILE) $(DEM_DIR)
-	unzip $(DEM_DIR)/$(PACKG_ZIP_FILE)	-d $(DEM_DIR)/$(BUILD_FILE_NAME)
-
 #------------------------------------------------------------------------------#
 # MAKE MEMTSTS                                                                 #
 #------------------------------------------------------------------------------#
@@ -268,7 +268,7 @@ memtst_containerized:  $(BUILD_FILE_NAME) build_unity $(TST_BINS_DIR) $(TST_BINS
 #------------------------------------------------------------------------------#
 .PHONY: service
 service:
-	@echo "Making background container..."
+	@echo "Running container in background"
 	@docker run                                                                \
 		-v "$$(pwd):/virtual"                                                  \
 		--name $(CNT_NAME)                                                     \
@@ -315,9 +315,9 @@ env: sservice
 .PHONY: massif
 massif:
 	@echo "Calling massif gen tool"
-	@valgrind --tool=massif --time-unit=B $(PROCESS)	
-	@ms_print massif.out.*
-	@rm massif.out.* gmon.out
+	valgrind --tool=massif --time-unit=B $(PROCESS)	
+	ms_print massif.out.*
+	rm massif.out.* gmon.out
 
 
 #------------------------------------------------------------------------------#
@@ -331,5 +331,5 @@ clean:
 	rm -rf $(DEMO_FILE_NAME).dSYM || true
 	rm -rf $(DEM_DIR)/**/*.h $(DEM_DIR)/*.zip  $(DEM_DIR)/**/*.a
 	find $(DEM_DIR) -type d -empty -delete
+	rm -rf "__.SYMDEF SORTED"
 	rm -rf massif.out.* gmon.out || true
-

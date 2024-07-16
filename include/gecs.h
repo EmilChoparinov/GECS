@@ -10,6 +10,7 @@
 #ifndef __HEADER_GECS_H__
 #define __HEADER_GECS_H__
 
+#include "logger.h"
 #include "types.h"
 #include <stdatomic.h>
 
@@ -103,23 +104,23 @@ bool gq_id_in(g_query *q, gid id);
 /* Unsafe: Add a new component with this function outside of the `g_progress`
            context. */
 #define G_ADD_COMPONENT(w, id, ty) g_add_component(w, id, #ty)
-void g_add_component(g_core *w, gid entt_id, char *name);
+void g_add_component(g_core *w, gid entt, char *name);
 
 /* Unsafe: Get a component with this function outside of the `g_progres`
            context. */
 #define G_GET_COMPONENT(w, id, ty) (ty *)(g_get_component(w, id, #ty));
-void *g_get_component(g_core *w, gid entt_id, char *name);
+void *g_get_component(g_core *w, gid entt, char *name);
 
 /* Unsafe: Set a component with this function outside of the `g_progress`
            context */
 #define G_SET_COMPONENT(w, id, ty, ...)                                        \
   g_set_component(w, id, #ty, (void *)&(ty)__VA_ARGS__)
-void g_set_component(g_core *w, gid entt_id, char *name, void *comp);
+void g_set_component(g_core *w, gid entt, char *name, void *comp);
 
 /* Unsafe: Remove a component with this function outside of the `g_progress`
            context. */
 #define G_REM_COMPONENT(w, id, ty) g_rem_component(w, id, #ty)
-void g_rem_component(g_core *w, gid entt_id, char *name);
+void g_rem_component(g_core *w, gid entt, char *name);
 
 /*-------------------------------------------------------
  * Thread Safe Component Operations
@@ -134,11 +135,11 @@ void *__gq_get(g_query *q, gid id, char *name);
 
 /* Set a component `ty` of entity `id` with the struct given */
 #define gq_set(q, id, ty, ...) __gq_set(q, id, #ty, (void *)&(ty)__VA_ARGS__)
-void __gq_set(g_query *q, gid entt_id, char *name, void *comp);
+void __gq_set(g_query *q, gid entt, char *name, void *comp);
 
 /* Remove a component `ty` from entity `id` */
 #define gq_rem(q, id, ty) __gq_rem(q, id, #ty)
-void __gq_rem(g_query *q, gid entt_id, char *name);
+void __gq_rem(g_query *q, gid entt, char *name);
 
 /*-------------------------------------------------------
  * Sequential Query Operations

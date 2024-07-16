@@ -49,16 +49,17 @@ void _cust_log(int LEVEL, const char *FILE, const char *FUNC, int LINE_NUM,
  * STATIC FUNCTION IMPLEMENTATION
  *-------------------------------------------------------*/
 static void log_to_stdout(log_t *log) {
-  char       time_buf[16];
-  time_t     time_obj;
-  struct tm *loc_time;
+  // char       time_buf[16];
+  // time_t     time_obj;
+  // struct tm *loc_time;
 
-  time_obj = time(NULL);
-  loc_time = localtime(&time_obj);
+  // time_obj = time(NULL);
+  // loc_time = localtime(&time_obj);
 
-  time_buf[strftime(time_buf, sizeof(time_buf), "%H:%M:%S", loc_time)] = '\0';
 
-  printf("%s ", time_buf);
+  // time_buf[strftime(time_buf, sizeof(time_buf), "%H:%M:%S", loc_time)] = '\0';
+
+  // printf("%s ", time_buf);
 
   switch (log->LEVEL) {
   case LOG_TRACE:

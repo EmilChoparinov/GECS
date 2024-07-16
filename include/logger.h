@@ -52,6 +52,10 @@ enum { LOG_TRACE, LOG_INFO, LOG_DEBUG, LOG_WARN, LOG_ERROR };
 
 #define log_enter log_info("entered")
 #define log_leave log_info("exited")
+#define log_leave_after(block)                                                 \
+  void *x = block;                                                             \
+  log_leave;                                                                   \
+  return x;
 #endif
 
 /* Deactivate macros */
@@ -64,6 +68,7 @@ enum { LOG_TRACE, LOG_INFO, LOG_DEBUG, LOG_WARN, LOG_ERROR };
 
 #define log_enter
 #define log_leave
+#define log_leave_after(...)
 #endif
 
 /**

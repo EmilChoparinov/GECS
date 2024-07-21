@@ -4,6 +4,7 @@ VEC_TYPE_IMPL(composite, void *);
 
 VEC_TYPE_IMPL(id_vec, gid);
 VEC_TYPE_IMPL(int64_vec, int64_t);
+VEC_TYPE_IMPL(system_vec, system_data);
 
 MAP_TYPE_IMPL(id_to_size, gid, gsize);
 MAP_TYPE_IMPL(id_to_id, gid, gid);

@@ -178,7 +178,7 @@ $(OBJ_DIR)/tests/libs/%.o: $(LIBS_DIR)/%$(EXT)
 #------------------------------------------------------------------------------#
 pkg: all 
 	@echo "Packaging..."
-	@mkdir $(PKG_DIR) || true
+	@mkdir -p $(PKG_DIR)
 	@for header in $(INC_FILES); do cp $$header $(PKG_DIR); done
 	@cp $(BUILD_LIB_FILE) $(PKG_DIR)
 	@echo "Done!"
@@ -189,7 +189,7 @@ pkg: all
 .PHONY: tests
 tests: $(BUILD_FILE_NAME) build_unity $(TST_BINS_DIR) $(TST_BINS) $(TST_OBJ_DIR)
 	@echo Running Tests...
-	@mkdir $(TST_DIR) || true
+	@mkdir -p $(TST_DIR)
 	@echo
 	@for test in $(TST_BINS) ; do ./$$test --verbose && echo ; done
 
@@ -219,7 +219,7 @@ $(TST_OBJ_DIR):
 # MAKE EXEC                                                                    #
 #------------------------------------------------------------------------------#
 exec: pkg $(DEM_DIR)
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(DEM_INC) -I./$(PKG_DIR)/ $(DEM_FILES) $(wildcard $(PKG_DIR)/*.a) -o $(DEMO_FILE_NAME)
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -lncurses $(DEM_INC) -I./$(PKG_DIR)/ $(DEM_FILES) $(wildcard $(PKG_DIR)/*.a) -o $(DEMO_FILE_NAME)
 
 $(DEM_DIR):
 	@echo in DEM_DIR

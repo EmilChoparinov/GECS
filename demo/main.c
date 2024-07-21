@@ -1,212 +1,211 @@
-#include "csdsa.h"
-#include <stdlib.h>
+/*-------------------------------------------------------
+ * This game uses the jump button to jump past the enemy.
+ * The enemy spawns on the right side and moves once per
+ * second to the left where the player is. The player must
+ * jump to dodge the enemy. If the player and enemy
+ * intersect, the game ends.
+ *-------------------------------------------------------*/
+#include "gecs.h"
 
-#define ID_IS_ENTITY    0
-#define ID_IS_COMPONENT 1
+#include <curses.h>
+#include <unistd.h>
 
-/* Component ID -> Index in related component vector */
-MAP_TYPEDEC(component_indexer, int32_t, int32_t);
-MAP_TYPE_IMPL(component_indexer, int32_t, int32_t);
+#define GAME_WIN_X 15
+#define GAME_WIN_Y 5
+#define UI_WIN_X   15
+#define UI_WIN_Y   2
 
-/* Entity ID -> Component Indexer */
-MAP_TYPEDEC(entity_map, int32_t, component_indexer);
-MAP_TYPE_IMPL(entity_map, int32_t, component_indexer);
+#define KEY_JUMP ' '
 
-/* Component ID -> Vector of component */
-MAP_TYPEDEC(component_datamap, int32_t, vec);
-MAP_TYPE_IMPL(component_datamap, int32_t, vec);
+WINDOW *GAME_WIN, *UI_WIN;
 
-VEC_TYPEDEC(int32_vec, int32_t);
-VEC_TYPE_IMPL(int32_vec, int32_t);
-
-typedef void (*sys)(vec *components);
-
-typedef struct ecs_sys ecs_sys;
-struct ecs_sys {
-  sys       ecs_system;   /* User defined function. */
-  int32_vec requirements; /* List of component IDs */
-};
-
-VEC_TYPEDEC(ecs_systems, ecs_sys);
-VEC_TYPE_IMPL(ecs_systems, ecs_sys);
-
-typedef struct ecs ecs;
-struct ecs {
-  int32_t           id_gen;     /* Generates unique IDs for the ECS demo */
-  entity_map        entities;   /* Contains all entity info */
-  component_datamap components; /* Contains all component data */
-  ecs_systems       systems;    /* Vector of all the systems */
-  stalloc          *alloc;      /* The allocator for this ECS */
-};
-
-static component_indexer *load_index_from_entity(ecs *e, int32_t entt) {
-  kvpair entity_kv = entity_map_get(&e->entities, &entt);
-  assert(entity_kv.value);
-  return entity_kv.value;
-}
-
-static vec *load_component_vector_from_id(ecs *e, int32_t comp_id) {
-  kvpair component_vec_kv = component_datamap_get(&e->components, &comp_id);
-  assert(component_vec_kv.value);
-  return component_vec_kv.value;
-}
-
-ecs *ecs_new(void) {
-  ecs *e = calloc(1, sizeof(ecs));
-
-  e->id_gen = 0;
-  e->alloc = stalloc_create(1024);
-  start_frame(e->alloc);
-
-  entity_map_hinit(&e->entities);
-  component_datamap_hinit(&e->components);
-  ecs_systems_hinit(&e->systems);
-
-  return e;
-}
-
-void ecs_progress(ecs *e) {
-  for (int64_t sys_i = 0; sys_i < e->systems.length; sys_i++) {
-    ecs_sys *sys = ecs_systems_at(&e->systems, sys_i);
-
-    if (sys->requirements.length == 0) {
-      sys->ecs_system(NULL);
-      continue;
-    }
-
-    for (int64_t comp_i = 0; comp_i < sys->requirements.length; comp_i++) {
-      int64_t *comp_id = vec_at(&sys->requirements, comp_i);
-      sys->ecs_system(load_component_vector_from_id(e, *comp_id));
-    }
-  }
-}
-
-void ecs_free(ecs *e) {
-  entity_map_free(&e->entities);
-  component_datamap_free(&e->components);
-  ecs_systems_hinit(&e->systems);
-  end_frame(e->alloc);
-  free(e);
-}
-
-int32_t ecs_id(ecs *e, int32_t FLAGS) {
-  int32_t new_id = e->id_gen++;
-
-  if (FLAGS == ID_IS_ENTITY) {
-    component_indexer new_indexer;
-    component_indexer_hinit(&new_indexer);
-    entity_map_put(&e->entities, &new_id, &new_indexer);
-  }
-  return new_id;
-}
-
-void register_system(ecs *e, int32_vec *requirements, sys system_func) {
-  ecs_sys new_system = {0};
-  new_system.ecs_system = system_func;
-  int32_vec_copy(&new_system.requirements, requirements);
-  ecs_systems_push(&e->systems, &new_system);
-}
-
-void register_component(ecs *e, int32_t comp_id, size_t component_size) {
-  /* Allocate 64 elements because why not. Sounds reasonable. */
-  vec component_vector;
-  __vec_init(&component_vector, component_size, get_frame_ctx(), TO_HEAP, 64);
-  component_datamap_put(&e->components, &comp_id, &component_vector);
-}
-
-void ecs_entt_add_component(ecs *e, int32_t entt, int32_t comp_id) {
-  vec *component_vector = load_component_vector_from_id(e, comp_id);
-
-  /* Place at the end of the list and store the position */
-  int64_t pos = component_vector->length;
-  vec_resize(component_vector, pos + 1);
-
-  /* Store the index the component lives at in the component vector. */
-  component_indexer_put(load_index_from_entity(e, entt), &comp_id, &pos);
-
-  /* Set the memory at this position to zero for convenience */
-  memset(vec_at(component_vector, pos), 0, component_vector->__el_size);
-}
-
-void ecs_entt_rem_component(ecs *e, int32_t entt, int32_t comp_id) {
-  /* Delete the component position for the entity*/
-  component_indexer_del(load_index_from_entity(e, entt), &comp_id);
-}
-void *ecs_entt_get_component(ecs *e, int32_t entt, int32_t comp_id) {
-  vec     *component_vector = load_component_vector_from_id(e, comp_id);
-  int32_t *pos =
-      component_indexer_get(load_index_from_entity(e, entt), &comp_id).value;
-
-  if(pos == NULL) return NULL;
-  return vec_at(component_vector, *pos);
-}
+bool game_alive = true;
 
 typedef struct Vec2 Vec2;
 struct Vec2 {
-  int16_t x, y;
+  int32_t x, y;
 };
 
-ecs    *e;
-int32_t PLAYER, FRIEND;
-int32_t VEC2_ID;
-bool    simulation_running = true;
+typedef struct Player Player;
+struct Player {
+  int8_t  hits_left;      /* Times player can be touched by an enemy */
+  int64_t last_jump_tick; /* Only allow jumps to last 1.5 seconds. Set to 0 when
+                            not jumping */
+  int8_t score;           /* Score tracking */
+};
 
-void gravity(vec *positions) {
-  for (int64_t i = 0; i < positions->length; i++) {
-    Vec2 *pos = vec_at(positions, i);
-    pos->y--;
+typedef struct Enemy Enemy;
+struct Enemy {
+  int64_t last_move_tick; /* Only update enemy when timer hits 0 */
+};
+
+gid PLAYER, ENEMY;
+
+TAG(is_player);
+TAG(is_enemy);
+
+void spawn_enemy(g_core *world) {
+  ENEMY = g_create_entity(world);
+  G_ADD_COMPONENT(world, ENEMY, Vec2);
+  G_ADD_COMPONENT(world, ENEMY, Enemy);
+  G_SET_COMPONENT(world, ENEMY, Vec2,
+                  {.x = GAME_WIN_X - 2, .y = GAME_WIN_Y - 2});
+  G_SET_COMPONENT(world, ENEMY, Enemy, {.last_move_tick = 0});
+}
+
+/* This function will run and update enemies in parallel */
+feach(update_enemy, g_pool, entity, {
+  Enemy *enemy = gq_field(entity, Enemy);
+  Vec2  *pos = gq_field(entity, Vec2);
+
+  /* Only update this enemy once per second */
+  log_debug("Processing enemy");
+  if (gq_tick_from_pool(entity) - enemy->last_move_tick < 2) return;
+  enemy->last_move_tick = gq_tick_from_pool(entity);
+  pos->x--;
+});
+void move_enemies_left_sys(g_query *q) {
+  /* Update enemy positions concurrently */
+  g_par enemies = gq_vectorize(q);
+  log_debug("In enemy system");
+  gq_each(enemies, update_enemy, NULL);
+}
+
+void player_actions_sys(g_query *q) {
+  log_enter;
+  if (!gq_id_in(q, PLAYER)) return;
+  log_debug("In player system");
+
+  /* Get player sequentially */
+  g_pool  player_pool = gq_seq(q);
+  Player *player = gq_field(player_pool, Player);
+  Vec2   *pos = gq_field(player_pool, Vec2);
+
+  if (gq_tick(q) - player->last_jump_tick < 3) return;
+
+  if (getch() == KEY_JUMP) {
+    log_debug("jumped");
+    player->last_jump_tick = gq_tick(q);
+    pos->y -= 1;
+    log_leave;
+    return;
+  }
+
+  pos->y = GAME_WIN_Y - 2;
+  log_leave;
+}
+
+void game_logic(g_core *world) {
+  Vec2 *player_pos = G_GET_COMPONENT(world, PLAYER, Vec2);
+  Vec2 *enemy_pos = G_GET_COMPONENT(world, ENEMY, Vec2);
+  log_debug("enemy: %d,%d", enemy_pos->y, enemy_pos->x);
+  log_debug("player: %d,%d", player_pos->y, player_pos->x);
+
+  Player *player_data = G_GET_COMPONENT(world, PLAYER, Player);
+
+  if (player_pos->x == enemy_pos->x) {
+    /* If the y's are the same, we take a hit. If the y's are different, we
+       take add to your score. */
+    if (player_pos->y == enemy_pos->y) {
+      player_data->hits_left--;
+      g_mark_delete(world, ENEMY);
+      spawn_enemy(world);
+    } else {
+      /* Process score only on even ticks because im lazy */
+      if (world->tick % 2 == 0) player_data->score++;
+    }
+  }
+
+  /* Check if the player has died and if so, Print game over and exit */
+  if (player_data->hits_left == 0) {
+    game_alive = false;
+  }
+
+  /* Check if enemy made it to the left side. If so, delete and respawn */
+  if (enemy_pos->x == -1) {
+    g_mark_delete(world, ENEMY);
+    spawn_enemy(world);
   }
 }
 
-void simulation_end_check() {
-  Vec2 *pos = ecs_entt_get_component(e, PLAYER, VEC2_ID);
-  if (pos && pos->y <= 0) {
-    printf("Player hit the ground!\n");
-    ecs_entt_rem_component(e, PLAYER, VEC2_ID);
-  } else
-    return;
+void render_game(g_core *world) {
+  Vec2 *player_pos = G_GET_COMPONENT(world, PLAYER, Vec2);
+  Vec2 *enemy_pos = G_GET_COMPONENT(world, ENEMY, Vec2);
 
-  pos = ecs_entt_get_component(e, FRIEND, VEC2_ID);
-  if (pos && pos->y <= 0) {
-    printf("Friend hit the ground!\n");
-    ecs_entt_rem_component(e, FRIEND, VEC2_ID);
-  } else
-    return;
+  Player *player_data = G_GET_COMPONENT(world, PLAYER, Player);
 
-  simulation_running = false;
+  /* Scan and put top down, left right */
+  wclear(GAME_WIN);
+  box(GAME_WIN, 0, 0);
+  for (int64_t y = 0; y < GAME_WIN_Y; y++) {
+    for (int64_t x = 0; x < GAME_WIN_X; x++) {
+      if (y == GAME_WIN_Y - 1 || y == 0) {
+        mvwaddch(GAME_WIN, y, x, '=');
+        continue;
+      }
+      if (y == player_pos->y && x == player_pos->x) {
+        mvwaddch(GAME_WIN, y, x, 'Y');
+        continue;
+      }
+      if (y == enemy_pos->y && x == enemy_pos->x) {
+        mvwaddch(GAME_WIN, y, x, '0');
+        continue;
+      }
+      mvwaddch(GAME_WIN, y, x, '.');
+    }
+  }
+
+  wclear(UI_WIN);
+  mvwprintw(UI_WIN, 0, 0, "Score: %d\n", player_data->score);
+  mvwprintw(UI_WIN, 1, 0, "Hits Left: %d\n", player_data->hits_left);
+
+  wrefresh(GAME_WIN);
+  wrefresh(UI_WIN);
+  refresh();
 }
 
 int main(void) {
-  e = ecs_new();
+  log_set_level(LOG_ERROR);
 
-  /* Register IDs */
-  PLAYER = ecs_id(e, ID_IS_ENTITY);
-  FRIEND = ecs_id(e, ID_IS_ENTITY);
-  VEC2_ID = ecs_id(e, ID_IS_COMPONENT);
+  /* Curses Init */
+  initscr();
+  keypad(stdscr, TRUE);
+  nodelay(stdscr, TRUE); /* make getch non-blocking */
+  noecho();
 
-  /* Register Components */
-  register_component(e, VEC2_ID, sizeof(Vec2));
+  GAME_WIN = newwin(GAME_WIN_Y, GAME_WIN_X, 0, 0);
+  UI_WIN = newwin(UI_WIN_Y, UI_WIN_X, GAME_WIN_Y, 0);
 
-  /* Register Systems */
-  int32_vec requirements;
-  int32_vec_hinit(&requirements);
+  /* SETUP PHASE */
+  g_core *world = g_create_world();
 
-  register_system(e, &requirements, simulation_end_check);
-  int32_vec_push(&requirements, &VEC2_ID);
-  register_system(e, &requirements, gravity);
+  /* Register Components Step */
+  G_COMPONENT(world, Vec2);
+  G_COMPONENT(world, Enemy);
+  G_COMPONENT(world, Player);
 
-  /* Populate PLAYER and FRIEND with the Vec2 Component */
-  ecs_entt_add_component(e, PLAYER, VEC2_ID);
-  ecs_entt_add_component(e, FRIEND, VEC2_ID);
+  /* Creating some entities */
+  PLAYER = g_create_entity(world);
 
-  /* Set the entities positions */
-  ((Vec2 *)ecs_entt_get_component(e, PLAYER, VEC2_ID))->y = 12;
-  ((Vec2 *)ecs_entt_get_component(e, FRIEND, VEC2_ID))->y = 10;
+  G_ADD_COMPONENT(world, PLAYER, Vec2);
+  G_ADD_COMPONENT(world, PLAYER, Player);
+  G_SET_COMPONENT(world, PLAYER, Vec2, {.x = 2, .y = GAME_WIN_Y - 2});
+  G_SET_COMPONENT(world, PLAYER, Player, {.hits_left = 3, .last_jump_tick = 0});
 
-  while (simulation_running) ecs_progress(e);
+  spawn_enemy(world);
+  G_SYSTEM(world, move_enemies_left_sys, Vec2, Enemy);
+  G_SYSTEM(world, player_actions_sys, Vec2, Player);
 
-  printf("Simulation Done\n");
+  while (game_alive) {
+    g_progress(world);
+    game_logic(world);
+    render_game(world);
+    usleep(500000 / 4);
+  }
 
-  ecs_free(e);
+  g_destroy_world(world);
+  endwin();
+  printf("Game over!\n");
+
   return 0;
 }

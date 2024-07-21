@@ -62,7 +62,7 @@ enum { LOG_TRACE, LOG_INFO, LOG_DEBUG, LOG_WARN, LOG_ERROR };
 #ifndef _DEBUG
 #define log_trace(...)
 #define log_info(...)
-#define log_debuf(...)
+#define log_debug(...)
 #define log_warn(...)
 #define log_error(...)
 

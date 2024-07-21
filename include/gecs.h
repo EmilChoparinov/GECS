@@ -24,14 +24,8 @@
 #define ENTITY_REG_START    1
 #define SYSTEM_REG_START    1
 
-typedef struct system_data system_data;
-struct system_data {
-  g_system start_system; /* A function pointer to a user defined function. */
-  type_set requirements; /* Set : [hash(comp name)] */
-};
-VEC_TYPEDEC(system_vec, system_data);
-
 struct g_core {
+  int64_t tick; /* The amount of times the world has progressed. */
   atomic_uint_least64_t id_gen; /* Generates unique IDs. This is typed as least
                                    and not fast uint64_t by design because of
                                    the papers smart entity bit arithmetic. */
@@ -98,6 +92,9 @@ void gq_mark_delete(g_query *q, gid entt);
 /* Check if a given entity `id` is currently processable by this system. */
 bool gq_id_in(g_query *q, gid id);
 
+#define gq_field_by_id(q, entt, ty) (ty *)(__gq_field_by_id(q, entt, #ty))
+void *__gq_field_by_id(g_query *q, gid entt, char *type);
+
 /*-------------------------------------------------------
  * Thread Unsafe Component Operations
  *-------------------------------------------------------*/
@@ -141,6 +138,22 @@ void __gq_set(g_query *q, gid entt, char *name, void *comp);
 #define gq_rem(q, id, ty) __gq_rem(q, id, #ty)
 void __gq_rem(g_query *q, gid entt, char *name);
 
+int64_t gq_tick(g_query *q);
+int64_t gq_tick_from_par(g_par par);
+int64_t gq_tick_from_pool(g_pool pool);
+
+/*-------------------------------------------------------
+ * Tag Operations
+ *-------------------------------------------------------*/
+/* Generate new tag for GECS to use */
+#define TAG(ty)                                                                \
+  typedef struct ty ty;                                                        \
+  struct ty {                                                                  \
+    int8_t _;                                                                  \
+  };
+
+#define G_TAG(w, ty) G_COMPONENT(w, ty);
+
 /*-------------------------------------------------------
  * Sequential Query Operations
  *-------------------------------------------------------*/
@@ -154,7 +167,7 @@ g_pool gq_next(g_pool itr);
 bool gq_done(g_pool itr);
 
 /* Select a component from the iterator to manipulate manually. */
-#define gq_field(itr, ty) (ty *)(__gq_field(itr, #ty))
+#define gq_field(itr, ty) (ty *)(__gq_field(&itr, #ty))
 void *__gq_field(g_pool *itr, char *type);
 
 /*-------------------------------------------------------
@@ -164,7 +177,7 @@ void *__gq_field(g_pool *itr, char *type);
 g_par gq_vectorize(g_query *q);
 
 /* Process vectorized tasks on each entity existing in the vector. */
-#define gq_each(vec, func, args) __gq_each(vec, (f_each)func, (void *)args);
+#define gq_each(vec, func, args) __gq_each(vec, (_each)func, (void *)args);
 void __gq_each(g_par vec, _each func, void *args);
 
 #endif

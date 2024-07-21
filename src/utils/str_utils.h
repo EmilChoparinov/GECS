@@ -16,6 +16,8 @@
 
 #include "csdsa.h"
 
-uint64_t hash_vector(vec *v);
-
+uint64_t  hash_vector(vec *v);
+set *vec_to_set(vec *v, set *out);
+vec *set_to_vec(set *s, vec *out);
+bool set_is_subset(set *super, set *maybe_sub);
 #endif

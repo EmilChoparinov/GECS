@@ -3,5 +3,5 @@ AlignConsecutiveDeclarations: true
 AlignConsecutiveMacros: true
 IndentWidth: 2
 ColumnLimit: 80
-AllowShortIfStatementsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AllowShortLoopsOnASingleLine: true

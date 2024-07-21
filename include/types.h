@@ -36,8 +36,11 @@ typedef struct g_par g_par;
 /* Type representing the interface between a system and GECS */
 typedef struct g_query g_query;
 
-/* Type representing a system */
+/* Type representing a system user function */
 typedef void (*g_system)(g_query *q);
+
+/* Type representing the system properties struct  */
+typedef struct system_data system_data;
 
 /* The core object GECS uses to manipulate its runtime. */
 typedef struct g_core g_core;
@@ -72,6 +75,7 @@ SET_TYPEDEC(type_set, int64_t);
 VEC_TYPEDEC(cache_vec, void *);
 MAP_TYPEDEC(cache_map, gid, void *);
 
+VEC_TYPEDEC(system_vec, system_data);
 /*-------------------------------------------------------
  * Public Structure Definitions
  *-------------------------------------------------------*/
@@ -95,7 +99,7 @@ struct archetype {
 
   /* A list of addresses pointing to system_data structs existing in the g_core
      struct. */
-  cache_vec contenders; /* Vec : *system_data */
+  system_vec contenders; /* Vec : system_data */
 
   /* entt_creation_buffer is filled when a system created new entities
      concurrently. */
@@ -105,19 +109,33 @@ struct archetype {
      concurrently. */
   id_vec entt_deletion_buffer; /* Vec : entt id */
 
+  /* Entities that have simulated operations over a tick are stored here. */
+  id_vec entt_mutation_buffer; /* Vec : entt id */
+
   /* dead_fragment_buffer is filled when a system transitions an entity off
      this archetype. These fragments are collected and cleaned per tick. */
   int64_vec dead_fragment_buffer; /* Vec : index_of(composite) */
 };
 
-struct g_pool {
-  gint64 idx;
-  g_par *entities; /* Vector : any size */
+struct g_par {
+  composite    *stored_components; /* Vector : fragment */
+  hash_to_size *component_offsets; /* Map : hash(comp id) -> gsize */
+  int64_t       tick;
 };
 
-struct g_par {
-  composite *stored_components; /* Vector : fragment */
-  id_to_size component_offsets; /* Map : hash(comp id) -> gsize */
+struct g_pool {
+  gint64 idx;
+  g_par  entities; /* Vector : any size */
+};
+
+struct g_query {
+  g_core    *world_ctx;
+  archetype *archetype_ctx;
+};
+
+struct system_data {
+  g_system start_system; /* A function pointer to a user defined function. */
+  type_set requirements; /* Set : [hash(comp name)] */
 };
 
 #endif

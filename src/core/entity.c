@@ -42,6 +42,8 @@ archetype *load_entity_archetype(g_core *w, gid entt) {
 gid g_create_entity(g_core *w) {
   log_enter;
   gid id = create_entity_using_idgen(w, &w->id_gen);
+  G_ADD_COMPONENT(w, id, GecID);
+  G_SET_COMPONENT(w, id, GecID, {.id = id});
   log_leave;
   return id;
 }
@@ -49,18 +51,15 @@ gid g_create_entity(g_core *w) {
 void g_mark_delete(g_core *w, gid entt) {
   log_enter;
 
-  /* Load archetype hash name from entity_registry */
-  kvpair ret = id_to_hash_get(&w->entity_registry, &entt);
-  assert(ret.value && "Entity does not exist!");
-  uint64_t hash_name = *(uint64_t *)ret.value;
-  if (!hash_name) { /* Empty archetype */
+  archetype *arch = load_entity_archetype(w, entt);
+  if (arch == &empty_archetype) {
     id_to_hash_del(&w->entity_registry, &entt);
     return;
   }
 
-  archetype *a = hash_to_archetype_get(&w->archetype_registry, ret.value).value;
-
-  id_vec_push(&a->entt_deletion_buffer, &entt);
+  id_to_hash_del(&w->entity_registry, &entt);
+  id_to_hash_del(&arch->entt_positions, &entt);
+  id_vec_push(&arch->entt_deletion_buffer, &entt);
 
   log_leave;
 }
@@ -107,6 +106,10 @@ bool gq_id_in(g_query *q, gid id) {
          id_to_hash_has(&q->archetype_ctx->simulation->entity_registry, &id);
 
   log_leave;
+}
+
+bool gq_id_alive(g_query *q, gid id) {
+  return id_to_hash_has(&q->world_ctx->entity_registry, &id);
 }
 
 void *__gq_field_by_id(g_query *q, gid entt, char *type) {

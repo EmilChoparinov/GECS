@@ -120,6 +120,7 @@ struct archetype {
 struct g_par {
   composite    *stored_components; /* Vector : fragment */
   hash_to_size *component_offsets; /* Map : hash(comp id) -> gsize */
+  archetype    *arch;
   int64_t       tick;
 };
 
@@ -136,6 +137,7 @@ struct g_query {
 struct system_data {
   g_system start_system; /* A function pointer to a user defined function. */
   type_set requirements; /* Set : [hash(comp name)] */
+  bool     assigned;
 };
 
 #endif

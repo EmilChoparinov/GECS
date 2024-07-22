@@ -1,3 +1,4 @@
+#include "archetype.h"
 #include "gecs.h"
 
 /*-------------------------------------------------------
@@ -36,6 +37,36 @@ void *__gq_field(g_pool *itr, char *type) {
   return buff_skip(&buff, *offset);
 }
 
+g_pool g_get_pool(g_core *w, char *query) {
+  log_enter;
+  start_frame(w->allocator);
+
+  g_pool pool = {0};
+
+  hash_vec type_hashes;
+  archetype_key(query, &type_hashes);
+  gid arch_id = hash_vector(&type_hashes);
+
+  archetype *arch = id_to_archetype_get(&w->archetype_registry, &arch_id).value;
+
+  vec out;
+  id_to_archetype_to_vec(&w->archetype_registry, &out);
+  for (int i = 0; i < out.length; i++) {
+    kvpair kv = read_kvpair(&w->archetype_registry, vec_at(&out, i));
+    log_debug("KEY: %ld", (gid *)kv.key);
+  }
+
+  assert(arch && "Archetype does not exist!");
+
+  pool.entities.component_offsets = &arch->offsets;
+  pool.entities.stored_components = &arch->components;
+  pool.idx = 0;
+
+  end_frame(w->allocator);
+  log_leave;
+  return pool;
+}
+
 /*-------------------------------------------------------
  * Parallel Query Operations
  *-------------------------------------------------------*/
@@ -43,6 +74,7 @@ g_par gq_vectorize(g_query *q) {
   g_par itr = {0};
   itr.component_offsets = &q->archetype_ctx->offsets;
   itr.stored_components = &q->archetype_ctx->components;
+  itr.arch = q->archetype_ctx;
   itr.tick = q->world_ctx->tick;
   return itr;
 }

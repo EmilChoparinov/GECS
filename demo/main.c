@@ -31,7 +31,6 @@ struct Player {
   int8_t  hits_left;      /* Times player can be touched by an enemy */
   int64_t last_jump_tick; /* Only allow jumps to last 1.5 seconds. Set to 0 when
                             not jumping */
-  int8_t score;           /* Score tracking */
 };
 
 typedef struct Enemy Enemy;
@@ -39,19 +38,10 @@ struct Enemy {
   int64_t last_move_tick; /* Only update enemy when timer hits 0 */
 };
 
-gid PLAYER, ENEMY;
+gid  PLAYER, ENEMY;
+bool hit_this_tick = false;
 
-TAG(is_player);
-TAG(is_enemy);
-
-void spawn_enemy(g_core *world) {
-  ENEMY = g_create_entity(world);
-  G_ADD_COMPONENT(world, ENEMY, Vec2);
-  G_ADD_COMPONENT(world, ENEMY, Enemy);
-  G_SET_COMPONENT(world, ENEMY, Vec2,
-                  {.x = GAME_WIN_X - 2, .y = GAME_WIN_Y - 2});
-  G_SET_COMPONENT(world, ENEMY, Enemy, {.last_move_tick = 0});
-}
+TAG(gen_enemies);
 
 /* This function will run and update enemies in parallel */
 feach(update_enemy, g_pool, entity, {
@@ -64,11 +54,22 @@ feach(update_enemy, g_pool, entity, {
   enemy->last_move_tick = gq_tick_from_pool(entity);
   pos->x--;
 });
+
 void move_enemies_left_sys(g_query *q) {
   /* Update enemy positions concurrently */
   g_par enemies = gq_vectorize(q);
   log_debug("In enemy system");
   gq_each(enemies, update_enemy, NULL);
+
+  /* Check for entities who have left the screen */
+  g_pool seq_enemies = gq_seq(q);
+  while (!gq_done(seq_enemies)) {
+    GecID *id = gq_field(seq_enemies, GecID);
+    if (!gq_id_alive(q, id->id)) return;
+    Vec2 *enemy_pos = gq_field(seq_enemies, Vec2);
+    if (enemy_pos->x == -1) gq_mark_delete(q, id->id);
+    seq_enemies = gq_next(seq_enemies);
+  }
 }
 
 void player_actions_sys(g_query *q) {
@@ -95,44 +96,50 @@ void player_actions_sys(g_query *q) {
   log_leave;
 }
 
+void enemy_generator(g_core *w) {
+  /* Only generate enemies on every 5 and 7 ticks */
+  int64_t tick = w->tick;
+  if (!(tick % 35 == 0)) return;
+  gid entt = g_create_entity(w);
+  G_ADD_COMPONENT(w, entt, Vec2);
+  G_ADD_COMPONENT(w, entt, Enemy);
+  G_SET_COMPONENT(w, entt, Vec2, {.x = GAME_WIN_X - 2, .y = GAME_WIN_Y - 2});
+  G_SET_COMPONENT(w, entt, Enemy, {.last_move_tick = 0});
+}
+
 void game_logic(g_core *world) {
   Vec2 *player_pos = G_GET_COMPONENT(world, PLAYER, Vec2);
-  Vec2 *enemy_pos = G_GET_COMPONENT(world, ENEMY, Vec2);
-  log_debug("enemy: %d,%d", enemy_pos->y, enemy_pos->x);
   log_debug("player: %d,%d", player_pos->y, player_pos->x);
 
   Player *player_data = G_GET_COMPONENT(world, PLAYER, Player);
 
-  if (player_pos->x == enemy_pos->x) {
-    /* If the y's are the same, we take a hit. If the y's are different, we
-       take add to your score. */
-    if (player_pos->y == enemy_pos->y) {
-      player_data->hits_left--;
-      g_mark_delete(world, ENEMY);
-      spawn_enemy(world);
-    } else {
-      /* Process score only on even ticks because im lazy */
-      if (world->tick % 2 == 0) player_data->score++;
-    }
-  }
+  if (hit_this_tick) player_data->hits_left--;
+  hit_this_tick = false;
 
   /* Check if the player has died and if so, Print game over and exit */
-  if (player_data->hits_left == 0) {
-    game_alive = false;
-  }
+  if (player_data->hits_left == 0) game_alive = false;
+}
 
-  /* Check if enemy made it to the left side. If so, delete and respawn */
-  if (enemy_pos->x == -1) {
-    g_mark_delete(world, ENEMY);
-    spawn_enemy(world);
-  }
+feach(check_collision, g_pool, enemy, {
+  Vec2 *player_pos = args;
+  Vec2 *enemy_pos = gq_field(enemy, Vec2);
+  /* Don't check against yourself in the Vec2 pool */
+  if (enemy_pos == player_pos) return;
+  if (player_pos->x == enemy_pos->x && player_pos->y == enemy_pos->y)
+    hit_this_tick = true;
+});
+void hit_detection(g_query *q) {
+  Vec2 *player_pos = G_GET_COMPONENT(q->world_ctx, PLAYER, Vec2);
+  /* Concurrently check all enemy positions against player */
+  g_par positions = gq_vectorize(q);
+  gq_each(positions, check_collision, player_pos);
 }
 
 void render_game(g_core *world) {
-  Vec2 *player_pos = G_GET_COMPONENT(world, PLAYER, Vec2);
-  Vec2 *enemy_pos = G_GET_COMPONENT(world, ENEMY, Vec2);
-
+  Vec2   *player_pos = G_GET_COMPONENT(world, PLAYER, Vec2);
   Player *player_data = G_GET_COMPONENT(world, PLAYER, Player);
+
+  g_pool enemies = G_GET_POOL(world, Vec2, Enemy);
 
   /* Scan and put top down, left right */
   wclear(GAME_WIN);
@@ -147,17 +154,16 @@ void render_game(g_core *world) {
         mvwaddch(GAME_WIN, y, x, 'Y');
         continue;
       }
-      if (y == enemy_pos->y && x == enemy_pos->x) {
-        mvwaddch(GAME_WIN, y, x, '0');
-        continue;
-      }
-      mvwaddch(GAME_WIN, y, x, '.');
     }
+  }
+  while (!gq_done(enemies)) {
+    Vec2 *pos = gq_field(enemies, Vec2);
+    mvwaddch(GAME_WIN, pos->y, pos->x, '0');
+    enemies = gq_next(enemies);
   }
 
   wclear(UI_WIN);
-  mvwprintw(UI_WIN, 0, 0, "Score: %d\n", player_data->score);
-  mvwprintw(UI_WIN, 1, 0, "Hits Left: %d\n", player_data->hits_left);
+  mvwprintw(UI_WIN, 0, 0, "Health: %d\n", player_data->hits_left);
 
   wrefresh(GAME_WIN);
   wrefresh(UI_WIN);
@@ -190,17 +196,18 @@ int main(void) {
   G_ADD_COMPONENT(world, PLAYER, Vec2);
   G_ADD_COMPONENT(world, PLAYER, Player);
   G_SET_COMPONENT(world, PLAYER, Vec2, {.x = 2, .y = GAME_WIN_Y - 2});
-  G_SET_COMPONENT(world, PLAYER, Player, {.hits_left = 3, .last_jump_tick = 0});
+  G_SET_COMPONENT(world, PLAYER, Player, {.hits_left = 25, .last_jump_tick = 0});
 
-  spawn_enemy(world);
   G_SYSTEM(world, move_enemies_left_sys, Vec2, Enemy);
   G_SYSTEM(world, player_actions_sys, Vec2, Player);
+  G_SYSTEM(world, hit_detection, Vec2);
 
   while (game_alive) {
+    enemy_generator(world);
     g_progress(world);
     game_logic(world);
     render_game(world);
-    usleep(500000 / 4);
+    usleep(500000 / 8);
   }
 
   g_destroy_world(world);

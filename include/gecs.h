@@ -45,6 +45,11 @@ struct g_core {
   system_vec system_registry; /* Vec : system_data */
 };
 
+typedef struct GecID GecID;
+struct GecID {
+  gid id;
+};
+
 /*-------------------------------------------------------
  * Container Operations
  *-------------------------------------------------------*/
@@ -91,6 +96,8 @@ void gq_mark_delete(g_query *q, gid entt);
 
 /* Check if a given entity `id` is currently processable by this system. */
 bool gq_id_in(g_query *q, gid id);
+
+bool gq_id_alive(g_query *q, gid id);
 
 #define gq_field_by_id(q, entt, ty) (ty *)(__gq_field_by_id(q, entt, #ty))
 void *__gq_field_by_id(g_query *q, gid entt, char *type);
@@ -169,6 +176,9 @@ bool gq_done(g_pool itr);
 /* Select a component from the iterator to manipulate manually. */
 #define gq_field(itr, ty) (ty *)(__gq_field(&itr, #ty))
 void *__gq_field(g_pool *itr, char *type);
+
+#define G_GET_POOL(world, ...) g_get_pool(world, "GecID, " #__VA_ARGS__)
+g_pool g_get_pool(g_core *world, char *query);
 
 /*-------------------------------------------------------
  * Parallel Query Operations

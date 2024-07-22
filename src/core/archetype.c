@@ -21,19 +21,20 @@ void init_archetype(g_core *w, archetype *a, hash_vec *key) {
      meaningless. */
   a->archetype_id = SELECT_ID(gid_atomic_incr(&w->id_gen));
   a->hash_name = hash_vector(key);
+  log_debug("NEW ARCH KEY: %ld", a->hash_name);
 
   /* Init indexers and component containers */
-  hash_to_size_inita(&a->offsets, w->allocator, TO_HEAP, 1);
-  id_to_int64_inita(&a->entt_positions, w->allocator, TO_HEAP, 1);
+  hash_to_size_inita(&a->offsets, w->allocator, TO_HEAP, 16);
+  id_to_int64_inita(&a->entt_positions, w->allocator, TO_HEAP, 16);
 
   /* Init system cache */
-  cache_vec_inita(&a->contenders, w->allocator, TO_HEAP, 1);
+  cache_vec_inita(&a->contenders, w->allocator, TO_HEAP, 16);
 
   /* Init buffers */
-  id_vec_inita(&a->entt_creation_buffer, w->allocator, TO_HEAP, 1);
-  id_vec_inita(&a->entt_deletion_buffer, w->allocator, TO_HEAP, 1);
-  id_vec_inita(&a->entt_mutation_buffer, w->allocator, TO_HEAP, 1);
-  int64_vec_inita(&a->dead_fragment_buffer, w->allocator, TO_HEAP, 1);
+  id_vec_inita(&a->entt_creation_buffer, w->allocator, TO_HEAP, 16);
+  id_vec_inita(&a->entt_deletion_buffer, w->allocator, TO_HEAP, 16);
+  id_vec_inita(&a->entt_mutation_buffer, w->allocator, TO_HEAP, 16);
+  int64_vec_inita(&a->dead_fragment_buffer, w->allocator, TO_HEAP, 16);
 
   /* Apply type set */
   vec_to_set(key, &a->types);
@@ -49,7 +50,7 @@ void init_archetype(g_core *w, archetype *a, hash_vec *key) {
 
   /* The lenghts of an element in the composite vector is equal to the final
      position of 'component_pos' */
-  __vec_init(&a->components, component_pos, w->allocator, TO_HEAP, 1);
+  __vec_init(&a->components, component_pos, w->allocator, TO_HEAP, 16);
 
   /* Caches don't get caches! Recursion base case here */
   if (SELECT_MODE(atomic_load(&w->id_gen)) == CACHED) {
@@ -96,7 +97,7 @@ void free_archetype(archetype *a) {
   log_leave;
 };
 
-compare(sort_hashes, int64_t, a, b, { return a < b; });
+static compare(sort_hashes, int64_t, a, b, { return a < b; });
 void archetype_key(char *types, hash_vec *hashes) {
   log_enter;
   assert(types);
@@ -110,8 +111,7 @@ void archetype_key(char *types, hash_vec *hashes) {
   }
   types = origin;
 
-  // int64_vec_sinit(hashes, type_count);
-  int64_vec_hinit(hashes);
+  hash_vec_sinit(hashes, type_count);
 
   regex_t     matcher;
   regmatch_t *groups = stpush(sizeof(regmatch_t) * (type_count + 1));
@@ -129,11 +129,11 @@ void archetype_key(char *types, hash_vec *hashes) {
     gid comp_id = (gid)hash_bytes(&cursor[arg_start], arg_end - arg_start);
 
     /* We sort after all are pushed */
-    id_vec_push(hashes, &comp_id);
+    hash_vec_push(hashes, &comp_id);
 
     cursor += arg_end; // Move the cursor to the end of the last match
   }
-  id_vec_sort(hashes, sort_hashes, NULL);
+  hash_vec_sort(hashes, sort_hashes, NULL);
   log_leave;
 }
 

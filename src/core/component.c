@@ -30,15 +30,15 @@ feach(push_to_types, kvpair, item, {
   gid      *id = item.key;
   hash_vec_push(type_list, id);
 });
+static compare(sort_hashes, gid, a, b, { return a < b; });
 void _g_add_component(g_core *w, gid entt, hash_vec *type_list) {
   log_enter;
-  start_frame(w->allocator);
 
   archetype *entt_arch = load_entity_archetype(w, entt);
 
   /* Assert all components in new_types are unique. We only do this check if
      we are not empty */
-  if (entt_arch != &empty_archetype) {
+  if (entt_arch->archetype_id != empty_archetype.archetype_id) {
     for (int64_t i = 0; i < type_list->length; i++) {
       gid *component_id = hash_vec_at(type_list, i);
       assert(!type_set_has(&entt_arch->types, component_id) &&
@@ -49,16 +49,15 @@ void _g_add_component(g_core *w, gid entt, hash_vec *type_list) {
   /* Perform delta transition */
   if (entt_arch != &empty_archetype) {
     map_foreach(&entt_arch->types.internals, push_to_types, type_list);
+    hash_vec_sort(type_list, sort_hashes, NULL);
   }
   delta_transition(w, entt, type_list);
 
-  end_frame(w->allocator);
   log_leave;
 }
 
 void *_g_get_component(g_core *w, gid entt, gid type) {
   log_enter;
-  start_frame(w->allocator);
 
   /* Load the archetype the entity exists in */
   archetype *entt_archetype = load_entity_archetype(w, entt);
@@ -76,14 +75,12 @@ void *_g_get_component(g_core *w, gid entt, gid type) {
   cbuff buff;
   buff_init(&buff, vec_at(&entt_archetype->components, *entt_pos));
 
-  end_frame(w->allocator);
   log_leave;
   return buff_skip(&buff, *offset);
 }
 
 void _g_set_component(g_core *w, gid entt, gid type, void *comp_data) {
   log_enter;
-  start_frame(w->allocator);
 
   /* Load the archetype the entity exists in */
   archetype *entt_archetype = load_entity_archetype(w, entt);
@@ -102,7 +99,6 @@ void _g_set_component(g_core *w, gid entt, gid type, void *comp_data) {
   buff_init(&buff, vec_at(&entt_archetype->components, *entt_pos));
   memmove(buff_skip(&buff, *offset), comp_data, *comp_size);
 
-  end_frame(w->allocator);
   log_leave;
 }
 
@@ -121,8 +117,12 @@ void g_add_component(g_core *w, gid entt, char *new_types) {
 
 void *g_get_component(g_core *w, gid entt_id, char *name) {
   log_enter;
+  start_frame(w->allocator);
+  void *comp =
+      _g_get_component(w, entt_id, (gid)hash_bytes(name, strlen(name)));
+  end_frame(w->allocator);
   log_leave;
-  return _g_get_component(w, entt_id, (gid)hash_bytes(name, strlen(name)));
+  return comp;
 }
 
 void g_set_component(g_core *w, gid entt, char *name, void *comp) {
@@ -169,17 +169,20 @@ void g_rem_component(g_core *w, gid entt, char *remove_types) {
 void __gq_add(g_query *q, gid entt, char *name) {
   /* Regardless of where the component exists. This transition must be
      simulated because it is not possible to parallelize. */
+  if (!q->archetype_ctx) return g_add_component(q->world_ctx, entt, name);
   id_vec_push(&q->archetype_ctx->entt_mutation_buffer, &entt);
   return g_add_component(q->archetype_ctx->simulation, entt, name);
 }
 
 void *__gq_get(g_query *q, gid entt, char *name) {
+  if (!q->archetype_ctx) return g_get_component(q->world_ctx, entt, name);
   gid type_id = (gid)hash_bytes(name, strlen(name));
   return g_get_component(select_component_location_ctx(q, entt, type_id), entt,
                          name);
 }
 
 void __gq_set(g_query *q, gid entt, char *name, void *comp) {
+  if (!q->archetype_ctx) return g_set_component(q->world_ctx, entt, name, comp);
   gid type_id = (gid)hash_bytes(name, strlen(name));
   return g_set_component(select_component_location_ctx(q, entt, type_id), entt,
                          name, comp);
@@ -200,7 +203,7 @@ void __gq_rem(g_query *q, gid entt, char *name) {
      Future cases: For future times, when the entity gets their component
      deleted, we only need to transition the archetype in the simulation
      context. */
-
+  if (!q->archetype_ctx) return g_rem_component(q->world_ctx, entt, name);
   archetype *arch = q->archetype_ctx;
   archetype *sim_arch = load_entity_archetype(arch->simulation, entt);
   id_vec_push(&q->archetype_ctx->entt_mutation_buffer, &entt);

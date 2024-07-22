@@ -140,16 +140,11 @@ feach(defrag_entity, kvpair, item, {
 feach(defrag_archetype, kvpair, item, {
   archetype *arch = item.value;
 
-
   composite vectorizor;
-  composite_hinit(&vectorizor);
-  // composite_sinit(&vectorizor,
-  //                 arch->components.length -
-  //                 arch->dead_fragment_buffer.length);
+  composite_sinit(&vectorizor, arch->components.length);
 
   int64_vec rolling_offsets;
-  int64_vec_hinit(&rolling_offsets);
-  // int64_vec_sinit(&rolling_offsets, arch->components.length);
+  int64_vec_sinit(&rolling_offsets, arch->components.length);
   int64_t dead_index = 0;
   for (int64_t i = 0; i < arch->components.length; i++) {
     if (dead_index < arch->dead_fragment_buffer.length &&
@@ -225,6 +220,9 @@ g_core *g_create_world(void) {
   system_vec_inita(&w->system_registry, w->allocator, TO_HEAP,
                    SYSTEM_REG_START);
 
+  /* Default component registrations */
+  G_COMPONENT(w, GecID);
+
   /* I decided to not put the empty archetype into the registry because I do
      not want to risk adding an extra collision when querying. It's ok to not
      put it in because the empty archetype represents garbage, so a user
@@ -256,7 +254,7 @@ void g_progress(g_core *w) {
   if (w->invalidate_fsm == 1) reassign_entity_fsm(w);
 
   /* Place the archetype vector in the stack */
-  w->archetype_registry.flags = TO_HEAP;
+  w->archetype_registry.flags = TO_STACK;
   vec archetypes;
   hash_to_archetype_to_vec(&w->archetype_registry, &archetypes);
   w->archetype_registry.flags = TO_HEAP;
@@ -271,8 +269,7 @@ void g_progress(g_core *w) {
     args[0] = w;
     args[1] = to_process;
 
-
-    /* Even if the composite is empty, we still will run the archetype to 
+    /* Even if the composite is empty, we still will run the archetype to
        simplify the join operation */
     pthread_create(&threads[i], NULL, thread_process_archetype, args);
   }
@@ -284,6 +281,17 @@ void g_progress(g_core *w) {
       exit(EXIT_FAILURE);
     }
   }
+
+  /* The algorithm from the paper that does layed intersections for maximum
+     concurrency over intersecting types is not support and all other
+     systems run sequentially */
+  // for (int64_t i = 0; i < w->system_registry.length; i++) {
+  //   system_data *sys = system_vec_at(&w->system_registry, i);
+  //   /* Systems not assigned to an archetype are intersecting */
+  //   if (!sys->assigned) {
+  //     sys->start_system(&(g_query){.archetype_ctx = NULL, .world_ctx = w});
+  //   }
+  // }
 
   migration_routine(w);
   cleanup_routine(w);

@@ -1,23 +1,43 @@
 #==============================================================================#
 #	Author: E.D Choparinov, Amsterdam
-#	Related Files: Makefile.h Makefile.c
 #	Created On: February 13 2024
 #	
-#	This Makefile contains commands for building and testing the GECS framework.
+#	This Makefile contains commands for building and testing the libcsdsa.
 #
 #	USAGE:
-#	make all    | Builds into a *.a binary for linking.
-#	make pkg	| Builds into a zip containing the *.a binary and *.h files.
-#	make demo   | Builds the demo which can be run by the user.
-#	make test   | Runs all tests in the test directory.
-#	make env	| Build a new docker image compatible with compiling.
-#	make docker | Enters a docker environment compatible with compiling.
-#	make memtst | Run all tests in the test directory. Activated in docker. Make
-#				  sure to run 'make env' first.
+#	make all     | Builds into a *.a binary for linking.
+#	make pkg     | Builds into a zip containing the *.a binary and *.h files.
+#	make exec    | Builds exec which can be used for development and testing.
+#	make test    | Runs a specific test in the test directory.
+#	make tests   | Runs all tests in the test directory.
+#	make env     | Build a new docker image compatible with compiling.
+#	make docker  | Enters a docker environment compatible with compiling.
+#   make service | Make a docker container in the background for entering.
+#   make sstop   | Stop the docker contaienr in the background
+#	make memtsts | Run all tests in the test directory. Activated in docker.
+#				   Make sure to run 'make env' first.
+#	make memtst  | Run specific test in the test directory. Actiated in docker.
+#				   Make sure to run 'make env' first.
+#	make massif  | Prints the massif runtime of a executable and deletes temps.
 #==============================================================================#
 
+#-------------------------------------------------------------------------------#
+# VARIABLES
+#-------------------------------------------------------------------------------#
+# 	PROCESS:
+#	  - Used in the context of make massif and make test. Example:
+#		make massif PROCESS=run_demo
+#		make test PROCESS=./tests/bin/vector_tests
+#		make memtest PROCESS=./tests/bin/map_tests
+#	BUILD_FILE_NAME:
+#	  - The name of the output file.
+PROCESS = $(DEMO_FILE_NAME)
+BUILD_FILE_NAME = libgecs
+PKG_DIR = dist
+LIBS = 
+
 #------------------------------------------------------------------------------#
-# DIRECTORY PATH CONFIGURATIONS												   #
+# DIRECTORY PATH CONFIGURATIONS                                                #
 #------------------------------------------------------------------------------#
 #	Directory Configurations
 #	INC_DIRS:
@@ -37,16 +57,21 @@
 #	TST_BINS_DIR:
 #	  - The directory to output each test binary
 #------------------------------------------------------------------------------#
-INC_DIR = -I./libs/ -I./include/ -I./src/structures/ -I./src/core/ -I./src/utils
+INC_DIR = -I./include/ -I./src/csdsa/ -I./src/core/ -I./src/utils/
 SRC_DIR = src
 OBJ_DIR = obj
-LIBS_DIR = libs
+DEM_DIR = demo
+DEM_OBJ = demo/objs
+DEM_INC = -I./demo/$(BUILD_FILE_NAME)
+TST_INC = -I./tests/unity -I./src/
 TST_DIR = tests
+UNITY_DIR = tests/unity
 BUILD_DIR = .
 TST_BINS_DIR = tests/bin
+TST_OBJ_DIR  = tests/objs
 
 #------------------------------------------------------------------------------#
-# COMPILER CONFIGURATIONS													   #
+# COMPILER CONFIGURATIONS                                                      #
 #------------------------------------------------------------------------------#
 #	CC:
 #	  - Compiler to use
@@ -66,24 +91,34 @@ CC = clang
 EXT = .c
 EXT_HDR = .h
 EXT_ARCHIVE = .a
-CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG $(INC_DIR)
+CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG
+BENCHFLAGS = -pg
 TESTFLAGS = -DUNITY_OUTPUT_COLOR
 BUILDFLAGS = -D_DEBUG
 
+#==============================================================================#
+# DOCKER CONFIGURATIONS                                                        #
+#==============================================================================#
+#	IMG_NAME:
+#	  - The name of the docker image
+#	CNT_NAME:
+#	  - The name of the docker container
+IMG_NAME = gecs-image
+CNT_NAME = gecs-container
+
 #------------------------------------------------------------------------------#
-# PROJECT CONFIGURATIONS													   #
+# PROJECT CONFIGURATIONS                                                       #
 #------------------------------------------------------------------------------#
-#	BUILD_FILE_NAME:
-#	  - The name of the output file.
 #	BUILD_LIB_FILE:
 #	  - The full path to where the output file will live.
 #------------------------------------------------------------------------------#
-BUILD_FILE_NAME = libgecs
-BUILD_LIB_FILE   = $(BUILD_DIR)/$(BUILD_FILE_NAME)$(EXT_ARCHIVE)
-PACKG_ZIP_FILE = $(BUILD_FILE_NAME).zip
+BUILD_LIB_FILE  = $(BUILD_DIR)/$(BUILD_FILE_NAME)$(EXT_ARCHIVE)
+PACKG_ZIP_FILE  = $(BUILD_FILE_NAME).zip
+DEMO_FILE_NAME  = run_demo
+UNITY_FILE_NAME = unity
 
 #------------------------------------------------------------------------------#
-# PROJECT FILE COLLETION													   #
+# PROJECT FILE COLLECTION                                                      #
 #------------------------------------------------------------------------------#
 #	SRC_FILES:
 #	  - Contains a list of all files in the SRC_DIR
@@ -101,124 +136,200 @@ PACKG_ZIP_FILE = $(BUILD_FILE_NAME).zip
 #	  - Contains a list of all output locations for the testing binaries.
 #------------------------------------------------------------------------------#
 SRC_FILES = $(shell find $(SRC_DIR) -name "*$(EXT)")
+ARC_FILES = $(shell find $(SRC_DIR) -name "*$(EXT_ARCHIVE)")
 HDR_FILES = $(shell find $(SRC_DIR) -name "*$(EXT_HDR)")
-LIB_FILES = $(wildcard $(LIBS_DIR)/*.c)
+INC_FILES = $(wildcard include/*.h)
 TST_FILES = $(wildcard $(TST_DIR)/*.c)
-OBJ_FILES = $(SRC_FILES:$(SRC_DIR)/%$(EXT)=$(OBJ_DIR)/%.o) $(LIB_FILES:$(LIBS_DIR)/%$(EXT)=$(OBJ_DIR)/libs/%.o)
+UNITY_FILES = $(wildcard $(UNITY_DIR)/*.c)
+TST_OBJ_FILES =  $(TST_FILES:$(TST_DIR)/%$(EXT)=$(TST_BINS_DIR)/%.o)
+DEM_FILES = $(wildcard $(DEM_DIR)/*.c)
+OBJ_FILES = $(SRC_FILES:$(SRC_DIR)/%$(EXT)=$(OBJ_DIR)/%.o) 
 TST_BINS  = $(patsubst $(TST_DIR)/%.c, $(TST_BINS_DIR)/%, $(TST_FILES))
 
 #------------------------------------------------------------------------------#
-# EXTERNAL MAKEFILES					 												   #
-#------------------------------------------------------------------------------#
-include demo.mk
-
-#------------------------------------------------------------------------------#
-# MAKE ALL					 												   #
+# MAKE ALL                                                                     #
 #------------------------------------------------------------------------------#
 all: notif $(BUILD_FILE_NAME)
 
 notif:
-	@echo Building ECS to ${BUILD_LIB_FILE}...
+	@echo Building to ${BUILD_LIB_FILE}...
 	@mkdir -p ${BUILD_DIR}
 
 $(BUILD_FILE_NAME): $(OBJ_FILES)
 	@echo Bundling...
-	ar cr $(BUILD_LIB_FILE) $^
+	@echo $(ARC_FILES)
+	@for libfile in $(ARC_FILES) ; do ar x $$libfile ; done
+	ar cr $(BUILD_LIB_FILE) *.o $^
+	rm *.o
 	@echo Done! GLHF
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%$(EXT)
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
-	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) -o $@ -c $<
 
-$(OBJ_DIR)/libs/%.o: $(LIBS_DIR)/%$(EXT)
+$(OBJ_DIR)/tests/libs/%.o: $(LIBS_DIR)/%$(EXT)
 	@mkdir -p $(@D)
 	@echo + $< -\> $@
-	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) -o $@ -c $<
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) -o $@ -c $<
 
 #------------------------------------------------------------------------------#
-# MAKE PKG					 												   #
+# MAKE PKG                                                                     #
 #------------------------------------------------------------------------------#
 pkg: all 
 	@echo "Packaging..."
-	zip -j $(PACKG_ZIP_FILE) $(HDR_FILES) $(BUILD_LIB_FILE)
+	@mkdir -p $(PKG_DIR)
+	@for header in $(INC_FILES); do cp $$header $(PKG_DIR); done
+	@cp $(BUILD_LIB_FILE) $(PKG_DIR)
+	@echo "Done!"
 
 #------------------------------------------------------------------------------#
-# MAKE TEST					 												   #
+# MAKE TEST                                                                    #
 #------------------------------------------------------------------------------#
-test: $(BUILD_FILE_NAME) $(TST_DIR) $(TST_BINS_DIR) $(TST_BINS)
+.PHONY: tests
+tests: $(BUILD_FILE_NAME) build_unity $(TST_BINS_DIR) $(TST_BINS) $(TST_OBJ_DIR)
 	@echo Running Tests...
+	@mkdir -p $(TST_DIR)
 	@echo
 	@for test in $(TST_BINS) ; do ./$$test --verbose && echo ; done
 
+test: $(BUILD_FILE_NAME) build_unity $(TST_BINS_DIR) $(TST_BINS) $(TST_OBJ_DIR)
+	@mkdir $(TST_DIR) || true
+	@./$(PROCESS) --verbose && echo
+
+build_unity:
+	@$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) -o $(UNITY_FILE_NAME).o -c $(UNITY_FILES)
+
+$(TST_OBJ_DIR)/%.o: $(TST_DIR)%.c
+	@mkdir -p $(@D)
+	@echo + $< -\> $@
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) -o $@ $< $(UNITY_FILE_NAME).o $(BUILD_LIB_FILE)
+
 $(TST_BINS_DIR)/%: $(TST_DIR)/%.c
 	@echo + $< -\> $@
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(TESTFLAGS) $< $(LIB_FILES) $(BUILD_LIB_FILE) -o $@
-
-$(TST_DIR):
-	@echo in TST_DIR
-	@mkdir $@
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) $(INC_DIR) $(TST_INC) $(TESTFLAGS) $< $(UNITY_FILE_NAME).o $(LIB_TST_FILES) $(BUILD_LIB_FILE) -o $@
 
 $(TST_BINS_DIR):
 	@mkdir $@
 
-#------------------------------------------------------------------------------#
-# MAKE MEMTST					 										   	   #
-#------------------------------------------------------------------------------#
-memtst:
-	@docker run --rm -it \
-		-v ".:/virtual" \
-		--name gecs-container \
-		gecs-image \
-		/bin/bash -c 'make memtst_containerized clean'
+$(TST_OBJ_DIR):
+	@mkdir $@
 
-memtst_containerized: $(BUILD_FILE_NAME) $(TST_DIR) $(TST_BINS_DIR) $(TST_BINS)
+#------------------------------------------------------------------------------#
+# MAKE EXEC                                                                    #
+#------------------------------------------------------------------------------#
+exec: pkg $(DEM_DIR)
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -lncurses $(DEM_INC) -I./$(PKG_DIR)/ $(DEM_FILES) $(wildcard $(PKG_DIR)/*.a) -o $(DEMO_FILE_NAME)
+
+$(DEM_DIR):
+	@echo in DEM_DIR
+	@mkdir $@
+#------------------------------------------------------------------------------#
+# MAKE MEMTSTS                                                                 #
+#------------------------------------------------------------------------------#
+memtsts:
+	@docker run --rm -it                                                       \
+		-v ".:/virtual"                                                        \
+		--name $(CNT_NAME)                                                     \
+		csdsa-image                                                            \
+		/bin/bash -c 'make memtsts_containerized clean'
+
+memtsts_containerized: $(BUILD_FILE_NAME) build_unity $(TST_BINS_DIR) $(TST_BINS) $(TST_OBJ_DIR)
 	@echo Running Valgrind with Tests...
-	@for test in $(TST_BINS) ; do valgrind 									   \
-		 --show-leak-kinds=all										   	       \
-		 --leak-check=full 													   \
-		 --track-origins=yes 												   \
-		 ./$$test --verbose 											       \
+	@for test in $(TST_BINS) ; do echo "***\nTEST: ./$$test\n***"; valgrind                                     \
+		 --show-leak-kinds=all                                                 \
+		 --leak-check=full                                                     \
+		 --track-origins=yes                                                   \
+		 --tool=memcheck \
+		 ./$$test --verbose                                                    \
 		 ; done
 
 #------------------------------------------------------------------------------#
-# MAKE DOCKER					 										   	   #
+# MAKE MEMTST                                                                  #
+#------------------------------------------------------------------------------#
+memtst:
+	@docker run --rm -it                                                       \
+		-v ".:/virtual"                                                        \
+		--name $(CNT_NAME)                                                     \
+		csdsa-image                                                            \
+		/bin/bash -c 'make memtst_containerized clean PROCESS=$(PROCESS)'
+
+memtst_containerized:  $(BUILD_FILE_NAME) build_unity $(TST_BINS_DIR) $(TST_BINS) $(TST_OBJ_DIR)
+	  @echo "Running with args 'PROCESS=$(PROCESS)'"
+	  @valgrind                                                                \
+		 --show-leak-kinds=all                                                 \
+		 --leak-check=full                                                     \
+		 --track-origins=yes                                                   \
+		 --tool=memcheck                                                       \
+		 $(PROCESS) --verbose 
+
+#------------------------------------------------------------------------------#
+# MAKE SERVICE                                                                 #
+#------------------------------------------------------------------------------#
+.PHONY: service
+service:
+	@echo "Running container in background"
+	@docker run                                                                \
+		-v "$$(pwd):/virtual"                                                  \
+		--name $(CNT_NAME)                                                     \
+		csdsa-image                                                            \
+		tail -f /dev/null
+	@echo "Done!"
+
+.PHONY: sservice
+sservice: 
+	@echo "Stoping background container..."
+	@docker stop $(CNT_NAME) || true
+	@docker rm $(CNT_NAME) || true
+
+#------------------------------------------------------------------------------#
+# MAKE DOCKER                                                                  #
 #------------------------------------------------------------------------------#
 .PHONY: docker
 docker:
 	@echo "Entering Container"
-	docker start gecs-container >/dev/null
-	docker exec -it gecs-container /bin/bash
-	@echo "Stopping container...please wait..."
-	@docker stop gecs-container
+	@docker run --rm -it                                                       \
+		-v "$$(pwd):/virtual"                                                  \
+		--name $(CNT_NAME)                                                     \
+		csdsa-image                                                            \
+		/bin/bash
 	@echo "Done!"
 
 #------------------------------------------------------------------------------#
-# MAKE ENV						 										   	   #
+# MAKE ENV                                                                     #
 #------------------------------------------------------------------------------#
 .PHONY: env
-env:
-	@echo "Ensuring source clean before building image... doing make clean..."
+env: sservice
+	@echo "Calling 'make clean' to ensure source is clean before building!"
 	@make clean
 	@echo "Done!"
-	@echo "Removing container and image if they already exist..."
-	@docker stop gecs-container || true
-	@docker rm gecs-container || true
-	@docker rmi gecs-image || true
+	@docker rmi $(IMG_NAME) || true
 	@echo "Done!"
 	@echo "Building image..."
-	@docker build -t gecs-image .
+	@docker build -t $(IMG_NAME) .
 	@echo "Done!"
 
 #------------------------------------------------------------------------------#
-# MAKE CLEAN																   #
+# MAKE MASSIF
+#------------------------------------------------------------------------------#
+.PHONY: massif
+massif:
+	@echo "Calling massif gen tool"
+	valgrind --tool=massif --time-unit=B $(PROCESS)	
+	ms_print massif.out.*
+	rm massif.out.* gmon.out
+
+
+#------------------------------------------------------------------------------#
+# MAKE CLEAN                                                                   #
 #------------------------------------------------------------------------------#
 .PHONY: clean
 clean:
-	@echo "Cleaning /$(OBJ_DIR)/* /$(TST_BINS_DIR)/* $(BUILD_LIB_FILE)"
-	@rm -r -f $(BUILD_LIB_FILE)
-	@rm -r -f $(OBJ_DIR)
-	@rm -r -f $(TST_BINS_DIR)
-	@rm -r -f $(PACKG_ZIP_FILE)
-	@rm -r -f $(DEMO_BUILD_LIB_FILE)
-	@rm -r -f ./demo/gecs
+	@echo "Cleaning generated files..."
+	rm -rf $(BUILD_LIB_FILE) $(OBJ_DIR) $(TST_BINS_DIR) $(PACKG_ZIP_FILE) || true
+	rm -rf $(DEMO_FILE_NAME) $(UNITY_FILE_NAME).o || true
+	rm -rf $(DEMO_FILE_NAME).dSYM || true
+	rm -rf $(DEM_DIR)/**/*.h $(DEM_DIR)/*.zip  $(DEM_DIR)/**/*.a
+	find $(DEM_DIR) -type d -empty -delete
+	rm -rf "__.SYMDEF SORTED"
+	rm -rf massif.out.* gmon.out || true

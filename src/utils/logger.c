@@ -49,29 +49,30 @@ void _cust_log(int LEVEL, const char *FILE, const char *FUNC, int LINE_NUM,
  * STATIC FUNCTION IMPLEMENTATION
  *-------------------------------------------------------*/
 static void log_to_stdout(log_t *log) {
-  char       time_buf[16];
-  time_t     time_obj;
-  struct tm *loc_time;
+  // char       time_buf[16];
+  // time_t     time_obj;
+  // struct tm *loc_time;
 
-  time_obj = time(NULL);
-  loc_time = localtime(&time_obj);
+  // time_obj = time(NULL);
+  // loc_time = localtime(&time_obj);
 
-  time_buf[strftime(time_buf, sizeof(time_buf), "%H:%M:%S", loc_time)] = '\0';
 
-  printf("%s ", time_buf);
+  // time_buf[strftime(time_buf, sizeof(time_buf), "%H:%M:%S", loc_time)] = '\0';
+
+  // printf("%s ", time_buf);
 
   switch (log->LEVEL) {
   case LOG_TRACE:
     printf(GRN "TRACE " RST);
     break;
   case LOG_INFO:
-    printf(BLU "INFO  " RST);
+    printf(BLU "INFO " RST);
     break;
   case LOG_DEBUG:
     printf(MAG "DEBUG " RST);
     break;
   case LOG_WARN:
-    printf(YEL "WARN  " RST);
+    printf(YEL "WARN " RST);
     break;
   case LOG_ERROR:
     printf(RED "ERROR " RST);
@@ -80,16 +81,7 @@ static void log_to_stdout(log_t *log) {
 
   printf("%s:%d [%s]: ", log->FILE, log->LINE_NUM, log->FUNC);
   vfprintf(stdout, log->FORMAT, log->to_print);
+  printf("\n");
   fflush(stdout);
 }
-#endif
-
-#ifndef _DEBUG
-/*-------------------------------------------------------
- * DISABLED DEBUGGING FUNCTION IMPLEMENTATIONS
- *-------------------------------------------------------*/
-void _cust_log(int LEVEL, const char *FILE, const char *FUNC, int LINE_NUM,
-               const char *FORMAT, ...) {}
-
-void log_set_level(void) {}
 #endif

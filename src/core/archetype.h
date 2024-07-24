@@ -27,7 +27,7 @@ void free_archetype(archetype *a);
 
 /* Given a string of types "ComponentA,ComponentB,ComponentC", hash each item
    delimited by ',' and sort the vector so that it is ordered. */
-void archetype_key(char *types, hash_vec *key);
+void archetype_key(g_core *w, char *types, hash_vec *key);
 
 /* Transition an entity from its current position to a new archetype with
    'types' */

@@ -6,6 +6,7 @@ libgecs.a
 libgecs.zip
 extra/**
 dist/**
+heap-export.txt
 
 ### C ###
 # Prerequisites

@@ -1,7 +1,9 @@
 #include <regex.h>
 
 #include "archetype.h"
+#include "core.h"
 #include "entity.h"
+#include "gecs.h"
 
 archetype empty_archetype = {0};
 
@@ -59,7 +61,7 @@ void init_archetype(g_core *w, archetype *a, hash_vec *key) {
   }
 
   /* Setup the archetypes simulation for non-concurrent properties */
-  a->simulation = g_create_world();
+  a->simulation = g_create_world_internal(AS_SIMULATION);
   gid_atomic_set(&a->simulation->id_gen, CACHED);
 
   /* Inside the simulation context, a transition can be triggered where there
@@ -94,11 +96,14 @@ void free_archetype(archetype *a) {
   id_vec_free(&a->entt_deletion_buffer);
   id_vec_free(&a->entt_mutation_buffer);
   int64_vec_free(&a->dead_fragment_buffer);
+
+  g_destroy_world(a->simulation);
+
   log_leave;
 };
 
 static compare(sort_hashes, int64_t, a, b, { return a < b; });
-void archetype_key(char *types, hash_vec *hashes) {
+void archetype_key(g_core *w, char *types, hash_vec *hashes) {
   log_enter;
   assert(types);
 
@@ -113,14 +118,12 @@ void archetype_key(char *types, hash_vec *hashes) {
 
   hash_vec_sinit(hashes, type_count);
 
-  regex_t     matcher;
   regmatch_t *groups = stpush(sizeof(regmatch_t) * (type_count + 1));
-  regcomp(&matcher, "(\\w+)", REG_EXTENDED);
 
-  assert(regexec(&matcher, types, type_count + 1, groups, 0) != REG_NOMATCH);
+  assert(regexec(&w->matcher, types, type_count + 1, groups, 0) != REG_NOMATCH);
 
   char *cursor = types;
-  while (regexec(&matcher, cursor, type_count + 1, groups, 0) == 0) {
+  while (regexec(&w->matcher, cursor, type_count + 1, groups, 0) == 0) {
     regoff_t arg_start = groups[0].rm_so;
     regoff_t arg_end = groups[0].rm_eo;
 
@@ -225,7 +228,10 @@ void delta_transition(g_core *w, gid entt, hash_vec *to_key) {
   void *next_seg = composite_at(&a_next->components, pos);
 
   type_set retained_types;
+  int32_t  old_flags = a_prev->types.internals.flags;
+  a_prev->types.internals.flags = TO_STACK;
   type_set_intersect(&a_prev->types, &a_next->types, &retained_types);
+  a_prev->types.internals.flags = old_flags;
 
   /* Migrate the retained types to a_next */
   // TODO: implement some type of iterator in sets because this:

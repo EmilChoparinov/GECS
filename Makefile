@@ -315,8 +315,8 @@ env: sservice
 .PHONY: massif
 massif:
 	@echo "Calling massif gen tool"
-	valgrind --tool=massif --time-unit=B $(PROCESS)	
-	ms_print massif.out.*
+	valgrind --tool=massif --time-unit=B --detailed-freq=5 --max-snapshots=1000 $(PROCESS)	
+	ms_print massif.out.* > heap-export.txt
 	rm massif.out.* gmon.out
 
 

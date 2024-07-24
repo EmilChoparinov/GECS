@@ -44,13 +44,17 @@ g_pool g_get_pool(g_core *w, char *query) {
   g_pool pool = {0};
 
   hash_vec type_hashes;
-  archetype_key(query, &type_hashes);
+  archetype_key(w, query, &type_hashes);
   gid arch_id = hash_vector(&type_hashes);
 
   archetype *arch = id_to_archetype_get(&w->archetype_registry, &arch_id).value;
 
-  vec out;
+  vec     out;
+  int32_t old_flags = w->archetype_registry.flags;
+  w->archetype_registry.flags = TO_STACK;
   id_to_archetype_to_vec(&w->archetype_registry, &out);
+  w->archetype_registry.flags = old_flags;
+  
   for (int i = 0; i < out.length; i++) {
     kvpair kv = read_kvpair(&w->archetype_registry, vec_at(&out, i));
     log_debug("KEY: %ld", (gid *)kv.key);

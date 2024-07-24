@@ -1,8 +1,10 @@
 #include "gecs.h"
 #include "archetype.h"
 #include "component.h"
+#include "core.h"
 #include "entity.h"
 #include "gid.h"
+#include <regex.h>
 #include <stdio.h>
 
 /*-------------------------------------------------------
@@ -132,11 +134,19 @@ static void cleanup_routine(g_core *w) {
   hash_to_archetype_foreach(&w->archetype_registry, cleanup_archetype, w);
 }
 
-feach(defrag_entity, kvpair, item, {
-  int64_vec *rolling_offsets = (int64_vec *)args;
-  int64_t   *pos = item.value;
-  *pos -= *int64_vec_at(rolling_offsets, *pos);
-});
+// feach(defrag_entity, kvpair, item, {
+//   int64_vec *rolling_offsets = (int64_vec *)args;
+//   int64_t   *pos = item.value;
+//   *pos -= *int64_vec_at(rolling_offsets, *pos);
+// });
+void defrag_entity(void *_el, void *args) {
+  kvpair item = *(kvpair *)_el;
+  {
+    int64_vec *rolling_offsets = (int64_vec *)args;
+    int64_t   *pos = item.value;
+    *pos -= *int64_vec_at(rolling_offsets, *pos);
+  }
+}
 feach(defrag_archetype, kvpair, item, {
   archetype *arch = item.value;
 
@@ -197,7 +207,7 @@ static void reassign_entity_fsm(g_core *w) {
 /*-------------------------------------------------------
  * Container Operations
  *-------------------------------------------------------*/
-g_core *g_create_world(void) {
+g_core *g_create_world_internal(int32_t flags) {
   log_enter;
 
   g_core *w = calloc(1, sizeof(*w));
@@ -208,6 +218,7 @@ g_core *g_create_world(void) {
   w->invalidate_fsm = 1;
   w->is_sequential = 1;
   w->tick = 0;
+  w->flags = flags;
 
   w->allocator = stalloc_create(STALLOC_DEFAULT);
 
@@ -220,8 +231,11 @@ g_core *g_create_world(void) {
   system_vec_inita(&w->system_registry, w->allocator, TO_HEAP,
                    SYSTEM_REG_START);
 
-  /* Default component registrations */
-  G_COMPONENT(w, GecID);
+  if (flags == AS_REAL) {
+    /* Default component registrations */
+    G_COMPONENT(w, GecID);
+    regcomp(&w->matcher, "(\\w+)", REG_EXTENDED);
+  }
 
   /* I decided to not put the empty archetype into the registry because I do
      not want to risk adding an extra collision when querying. It's ok to not
@@ -230,6 +244,8 @@ g_core *g_create_world(void) {
   log_leave;
   return w;
 }
+
+g_core *g_create_world(void) { return g_create_world_internal(AS_REAL); }
 
 void process_archetype(g_core *w, archetype *process_arch) {
   for (int64_t i = 0; i < process_arch->contenders.length; i++) {
@@ -285,13 +301,6 @@ void g_progress(g_core *w) {
   /* The algorithm from the paper that does layed intersections for maximum
      concurrency over intersecting types is not support and all other
      systems run sequentially */
-  // for (int64_t i = 0; i < w->system_registry.length; i++) {
-  //   system_data *sys = system_vec_at(&w->system_registry, i);
-  //   /* Systems not assigned to an archetype are intersecting */
-  //   if (!sys->assigned) {
-  //     sys->start_system(&(g_query){.archetype_ctx = NULL, .world_ctx = w});
-  //   }
-  // }
 
   migration_routine(w);
   cleanup_routine(w);
@@ -317,6 +326,9 @@ void g_destroy_world(g_core *w) {
   id_to_hash_free(&w->entity_registry);
 
   stalloc_free(w->allocator);
+
+  if (w->flags == AS_REAL) regfree(&w->matcher);
+
   free(w);
 
   log_leave;
@@ -360,7 +372,7 @@ void g_register_system(g_core *w, g_system sys, char *query) {
 
   /* Collect the component id hashes */
   hash_vec type_hashes;
-  archetype_key(query, &type_hashes);
+  archetype_key(w, query, &type_hashes);
   hash_vec_foreach(&type_hashes, is_registered, w); /* Sanity check */
 
   type_set types;

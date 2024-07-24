@@ -12,6 +12,7 @@
 
 #include "logger.h"
 #include "types.h"
+#include <regex.h>
 #include <stdatomic.h>
 
 /*-------------------------------------------------------
@@ -19,10 +20,10 @@
  *     *_START: Define the initial sizes of objects
  *              existing in g_core.
  *-------------------------------------------------------*/
-#define ARCHETYPE_REG_START 1
-#define COMPONENT_REG_START 1
-#define ENTITY_REG_START    1
-#define SYSTEM_REG_START    1
+#define ARCHETYPE_REG_START 16
+#define COMPONENT_REG_START 16
+#define ENTITY_REG_START    16
+#define SYSTEM_REG_START    16
 
 struct g_core {
   int64_t tick; /* The amount of times the world has progressed. */
@@ -43,6 +44,9 @@ struct g_core {
   hash_to_size      component_registry; /* Map : hash(comp name) -> comp size */
   id_to_hash entity_registry; /* Map : entt id -> hash(Ordered[comp name]) */
   system_vec system_registry; /* Vec : system_data */
+
+  regex_t matcher; /* The regex used to parse components. */
+  int32_t flags;   /* The context the world will exist in. Either real or sim */
 };
 
 typedef struct GecID GecID;

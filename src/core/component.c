@@ -109,7 +109,7 @@ void g_add_component(g_core *w, gid entt, char *new_types) {
   log_enter;
   start_frame(w->allocator);
   hash_vec types;
-  archetype_key(new_types, &types);
+  archetype_key(w, new_types, &types);
   _g_add_component(w, entt, &types);
   end_frame(w->allocator);
   log_leave;
@@ -139,7 +139,7 @@ void g_rem_component(g_core *w, gid entt, char *remove_types) {
   archetype *entt_archetype = load_entity_archetype(w, entt);
 
   hash_vec rem_types;
-  archetype_key(remove_types, &rem_types);
+  archetype_key(w, remove_types, &rem_types);
 
   /* Remove all types in rem_types from a copy of the entities type_set */
   type_set retained_types;

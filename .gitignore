@@ -6,7 +6,6 @@ libgecs.a
 libgecs.zip
 extra/**
 dist/**
-
 ### C ###
 # Prerequisites
 *.d
@@ -33,6 +32,7 @@ dist/**
 *.lo
 
 # Project Specific Libraries
+!libcsdsa.a
 !libunity.a
 
 # Shared objects (inc. Windows DLLs)

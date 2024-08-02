@@ -543,5 +543,6 @@ void *buff_skip(cbuff *b, size_t to_skip);
 void     memswap(void *a, void *b, size_t size);
 void    *recalloc(void *a, size_t size);
 uint64_t hash_bytes(void *ptr, size_t size);
+void    *align_ptr_to(int64_t width, void *ptr);
 
 #endif

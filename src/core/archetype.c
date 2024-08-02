@@ -21,6 +21,7 @@ void init_archetype(g_core *w, archetype *a, hash_vec *key) {
      meaningless. */
   a->archetype_id = SELECT_ID(gid_atomic_incr(&w->id_gen));
   a->hash_name = hash_vector(key);
+  a->allocator = stalloc_create(256);
   log_debug("NEW ARCH KEY: %ld", a->hash_name);
 
   /* Init indexers and component containers */
@@ -28,7 +29,7 @@ void init_archetype(g_core *w, archetype *a, hash_vec *key) {
   id_to_int64_inita(&a->entt_positions, w->allocator, TO_HEAP, 16);
 
   /* Init system cache */
-  cache_vec_inita(&a->contenders, w->allocator, TO_HEAP, 16);
+  system_vec_inita(&a->contenders, w->allocator, TO_HEAP, 16);
 
   /* Init buffers */
   id_vec_inita(&a->entt_creation_buffer, w->allocator, TO_HEAP, 16);
@@ -54,6 +55,7 @@ void init_archetype(g_core *w, archetype *a, hash_vec *key) {
 
   /* Caches don't get caches! Recursion base case here */
   if (SELECT_MODE(atomic_load(&w->id_gen)) == CACHED) {
+    a->simulation = NULL;
     log_leave;
     return;
   }
@@ -87,13 +89,16 @@ void free_archetype(archetype *a) {
   vec_free(&a->components);
   hash_to_size_free(&a->offsets);
   id_to_int64_free(&a->entt_positions);
+  stalloc_free(a->allocator);
 
-  cache_vec_free(&a->contenders);
+  system_vec_free(&a->contenders);
 
   id_vec_free(&a->entt_creation_buffer);
   id_vec_free(&a->entt_deletion_buffer);
   id_vec_free(&a->entt_mutation_buffer);
   int64_vec_free(&a->dead_fragment_buffer);
+
+  if (a->simulation) g_destroy_world(a->simulation);
   log_leave;
 };
 
@@ -112,6 +117,37 @@ void archetype_key(char *types, hash_vec *hashes) {
   types = origin;
 
   hash_vec_sinit(hashes, type_count);
+
+  int64_t end_pos, start_pos;
+  origin = types;
+  end_pos = 0;
+  start_pos = 0;
+  while (*types) {
+
+    /* Skip spaces */
+    while (*types == ' ') {
+      start_pos++;
+      end_pos++;
+      types++;
+    }
+
+    if (*types == ',') {
+      gid comp_id = (gid)hash_bytes(origin + start_pos, end_pos - start_pos);
+      hash_vec_push(hashes, &comp_id);
+      start_pos = end_pos + 1;
+    }
+    types++;
+    end_pos++;
+  }
+
+  if (start_pos != end_pos) {
+    gid comp_id = (gid)hash_bytes(origin + start_pos, end_pos - start_pos);
+    hash_vec_push(hashes, &comp_id);
+  }
+
+  hash_vec_sort(hashes, sort_hashes, NULL);
+
+  return;
 
   regex_t     matcher;
   regmatch_t *groups = stpush(sizeof(regmatch_t) * (type_count + 1));
@@ -189,7 +225,7 @@ void delta_transition(g_core *w, gid entt, hash_vec *to_key) {
   if (a_prev == &empty_archetype) {
     /* Add one more space for the incomming entity to this archetype. */
     int64_t pos = a_next->components.length;
-    composite_resize(&a_next->components, a_next->components.length + 1);
+    vec_resize(&a_next->components, a_next->components.length + 1);
     memset(composite_at(&a_next->components, pos), 0,
            a_next->components.__el_size);
 
@@ -225,7 +261,10 @@ void delta_transition(g_core *w, gid entt, hash_vec *to_key) {
   void *next_seg = composite_at(&a_next->components, pos);
 
   type_set retained_types;
+  int32_t  old_flags = a_prev->types.internals.flags;
+  a_prev->types.internals.flags = TO_STACK;
   type_set_intersect(&a_prev->types, &a_next->types, &retained_types);
+  a_prev->types.internals.flags = old_flags;
 
   /* Migrate the retained types to a_next */
   // TODO: implement some type of iterator in sets because this:

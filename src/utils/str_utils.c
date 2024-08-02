@@ -16,10 +16,24 @@ set *vec_to_set(vec *v, set *out) {
   vec_foreach(v, push_to_set, out);
   return out;
 }
+
 vec *set_to_vec(set *s, vec *out) {
   int32_t old_flags = s->internals.flags;
   s->internals.flags = TO_STACK;
-  map_to_vec(&s->internals, out);
+
+  int64_t set_len = set_length(s);
+
+  vec kv_elements;
+  map_to_vec(&s->internals, &kv_elements);
+
+  __vec_init(out, s->internals.__key_size, s->internals.allocator, TO_STACK,
+             set_len);
+
+  for (int64_t i = 0; i < set_len; i++) {
+    kvpair kv = read_kvpair(&s->internals, vec_at(&kv_elements, i));
+    vec_push(out, kv.key);
+  }
+
   s->internals.flags = old_flags;
   return out;
 }

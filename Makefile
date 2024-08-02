@@ -91,7 +91,8 @@ CC = clang
 EXT = .c
 EXT_HDR = .h
 EXT_ARCHIVE = .a
-CXXFLAGS = -gdwarf-4 -O3 -Wall -Werror -UDEBUG
+CXXFLAGS = -gdwarf-4 -Wall -Werror -UDEBUG
+DEMO_FLAGS = -lrt -lncurses
 BENCHFLAGS = -pg
 TESTFLAGS = -DUNITY_OUTPUT_COLOR
 BUILDFLAGS = -D_DEBUG
@@ -219,7 +220,7 @@ $(TST_OBJ_DIR):
 # MAKE EXEC                                                                    #
 #------------------------------------------------------------------------------#
 exec: pkg $(DEM_DIR)
-	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -lncurses $(DEM_INC) -I./$(PKG_DIR)/ $(DEM_FILES) $(wildcard $(PKG_DIR)/*.a) -o $(DEMO_FILE_NAME)
+	$(CC) $(BUILDFLAGS) $(CXXFLAGS) -lncurses $(DEMO_FLAGS) $(DEM_INC) -I./$(PKG_DIR)/ $(DEM_FILES) $(wildcard $(PKG_DIR)/*.a) -o $(DEMO_FILE_NAME)
 
 $(DEM_DIR):
 	@echo in DEM_DIR

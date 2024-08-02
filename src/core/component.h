@@ -18,4 +18,6 @@
 void  _g_add_component(g_core *w, gid entt, hash_vec *new_types);
 void *_g_get_component(g_core *w, gid entt, gid type);
 void  _g_set_component(g_core *w, gid entt, gid type, void *comp_data);
+bool  _g_has_component(g_core *w, gid entt, gid type);
+void  __gq_mut(g_query *q, gid entt);
 #endif

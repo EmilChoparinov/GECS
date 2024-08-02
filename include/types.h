@@ -84,6 +84,8 @@ struct archetype {
   gid      archetype_id; /* Unique identifier for this archetype. */
   uint64_t hash_name;    /* This is the hash of hash(Ordered(types)) */
 
+  stalloc *allocator; /* Allocator used in concurrent contexts */
+
   /* These two types are used for scheduling systems. Types is also used for
      transitioning archetypes. */
   type_set types; /* Set : [hash(comp name)] */
@@ -121,6 +123,7 @@ struct g_par {
   composite    *stored_components; /* Vector : fragment */
   hash_to_size *component_offsets; /* Map : hash(comp id) -> gsize */
   archetype    *arch;
+  g_core       *world;
   int64_t       tick;
 };
 
@@ -137,7 +140,7 @@ struct g_query {
 struct system_data {
   g_system start_system; /* A function pointer to a user defined function. */
   type_set requirements; /* Set : [hash(comp name)] */
-  bool     assigned;
+  int32_t  readonly;
 };
 
 #endif

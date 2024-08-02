@@ -57,7 +57,6 @@ void g_mark_delete(g_core *w, gid entt) {
     return;
   }
 
-  id_to_hash_del(&w->entity_registry, &entt);
   id_to_hash_del(&arch->entt_positions, &entt);
   id_vec_push(&arch->entt_deletion_buffer, &entt);
 
@@ -75,6 +74,8 @@ gid gq_create_entity(g_query *q) {
      IDs consistent. This is ok because idgen is made to be thread safe. */
   gid id = create_entity_using_idgen(q->archetype_ctx->simulation,
                                      &q->world_ctx->id_gen);
+
+  id_vec_push(&q->archetype_ctx->entt_creation_buffer, &id);
 
   log_leave;
   return id;

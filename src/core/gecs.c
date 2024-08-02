@@ -40,6 +40,11 @@ static void archetype_simulate_creations(g_core *w, archetype *a) {
        deletion algorithm since it runs first. */
     if (id_to_hash_has(&w->entity_registry, entt)) continue;
 
+    /* Offically add the entity to the map */
+    map_put(&w->entity_registry, entt, &empty_archetype.hash_name);
+    G_ADD_COMPONENT(w, *entt, GecID);
+    G_SET_COMPONENT(w, *entt, GecID, {.id = *entt});
+
     /* Load simulated archetype */
     archetype *sim_arch = load_entity_archetype(a->simulation, *entt);
     hash_vec   types;
@@ -50,9 +55,11 @@ static void archetype_simulate_creations(g_core *w, archetype *a) {
     // TODO: This is an optimization opportunity. It's possible to directly
     //       do a memmove instead of using get_component and set_component
     for (int64_t type_i = 0; type_i < types.length; type_i++) {
-      gid  *type = hash_vec_at(&types, type_i);
-      void *seg = _g_get_component(w, *entt, *type);
-      _g_set_component(w, *entt, *type, seg);
+      gid *type = hash_vec_at(&types, type_i);
+      if (_g_has_component(a->simulation, *entt, *type)) {
+        void *seg = _g_get_component(a->simulation, *entt, *type);
+        _g_set_component(w, *entt, *type, seg);
+      }
     }
   }
 }
@@ -137,11 +144,14 @@ feach(defrag_entity, kvpair, item, {
   int64_t   *pos = item.value;
   *pos -= *int64_vec_at(rolling_offsets, *pos);
 });
+
 feach(defrag_archetype, kvpair, item, {
   archetype *arch = item.value;
+  if (arch->components.length == 0) return;
 
   composite vectorizor;
-  composite_sinit(&vectorizor, arch->components.length);
+  __vec_init(&vectorizor, arch->components.__el_size, arch->allocator, TO_HEAP,
+             arch->components.length);
 
   int64_vec rolling_offsets;
   int64_vec_sinit(&rolling_offsets, arch->components.length);
@@ -161,11 +171,19 @@ feach(defrag_archetype, kvpair, item, {
   /* Rewire vectorizer and components. Since vectorizer is stack allocated,
      we need to recycle the composite address pointer and memove the cleaned
      dataset from vectorizer to components to it. */
-  composite_resize(&arch->components, vectorizor.length);
   memmove(arch->components.elements, vectorizor.elements,
           vectorizor.length * vectorizor.__el_size);
+  void *old_elements = vectorizor.elements;
+
+  vectorizor.elements = arch->components.elements;
+  memmove(&arch->components, &vectorizor, sizeof(composite));
+
+  vectorizor.elements = old_elements;
+  composite_free(&vectorizor);
+
   id_to_int64_foreach(&arch->entt_positions, defrag_entity, &rolling_offsets);
 });
+
 static void defragment_routine(g_core *w) {
   hash_to_archetype_foreach(&w->archetype_registry, defrag_archetype, NULL);
 }
@@ -207,6 +225,7 @@ g_core *g_create_world(void) {
 
   w->invalidate_fsm = 1;
   w->is_sequential = 1;
+  w->disable_concurrency = 0;
   w->tick = 0;
 
   w->allocator = stalloc_create(STALLOC_DEFAULT);
@@ -231,12 +250,57 @@ g_core *g_create_world(void) {
   return w;
 }
 
+void *boot_system(void *arg) {
+  void       **args = (void **)arg;
+  system_data *sys = args[0];
+  g_query     *query = args[1];
+  sys->start_system(query);
+  return NULL;
+}
+
 void process_archetype(g_core *w, archetype *process_arch) {
+  start_frame(process_arch->allocator);
+
+  system_vec readonlys;
+  system_vec_sinit(&readonlys, process_arch->contenders.length);
+
   for (int64_t i = 0; i < process_arch->contenders.length; i++) {
-    system_vec_at(&process_arch->contenders, i)
-        ->start_system(
-            &(g_query){.world_ctx = w, .archetype_ctx = process_arch});
+    system_data *sys = system_vec_at(&process_arch->contenders, i);
+    if (sys->readonly != 0) {
+      system_vec_push(&readonlys, sys);
+      continue;
+    }
+    sys->start_system(
+        &(g_query){.world_ctx = w, .archetype_ctx = process_arch});
   }
+
+  if (readonlys.length == 0) return;
+
+  pthread_t *threads = stpush(readonlys.length * sizeof(pthread_t));
+
+  for (int64_t i = 0; i < readonlys.length; i++) {
+    system_data *sys = system_vec_at(&readonlys, i);
+    g_query      q = {.world_ctx = w, .archetype_ctx = process_arch};
+    if (w->disable_concurrency == 1) {
+      sys->start_system(&q);
+    } else {
+      void **args = stpush(2 * sizeof(void *));
+      args[0] = sys;
+      args[1] = &q;
+      pthread_create(&threads[i], NULL, boot_system, args);
+    }
+  }
+
+  if (w->disable_concurrency == 0) {
+    for (int64_t i = 0; i < readonlys.length; i++) {
+      if (pthread_join(threads[i], NULL)) {
+        log_debug("Thread unable to be joined");
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+
+  end_frame(process_arch->allocator);
 }
 void *thread_process_archetype(void *arg) {
   log_enter;
@@ -245,6 +309,46 @@ void *thread_process_archetype(void *arg) {
   log_leave;
   return NULL;
 }
+
+typedef struct thread_args {
+  int64_t    index;
+  pthread_t *threads;
+  g_core    *w;
+} thread_args;
+void thread_archetype(void *_el, void *args) {
+  kvpair item = *(kvpair *)_el;
+  {
+    thread_args *targs = (thread_args *)args;
+    void       **process_args = __stpushframe(2 * sizeof(void *));
+    process_args[0] = targs->w;
+    process_args[1] = item.value;
+    if (targs->w->disable_concurrency == 1) {
+      process_archetype(targs->w, item.value);
+      return;
+    }
+    pthread_create(&targs->threads[targs->index], ((void *)0),
+                   thread_process_archetype, process_args);
+    targs->index++;
+  }
+}
+
+// feach(thread_archetype, kvpair, item, {
+//   thread_args *targs = (thread_args *)args;
+
+//   void **process_args = stpush(2 * sizeof(void *));
+//   process_args[0] = targs->w;
+//   process_args[1] = item.value;
+
+//   if (targs->w->disable_concurrency == 1) {
+//     process_archetype(targs->w, item.value);
+//     return;
+//   }
+
+//   pthread_create(&targs->threads[targs->index], NULL,
+//   thread_process_archetype,
+//                  process_args);
+//   targs->index++;
+// });
 void g_progress(g_core *w) {
   start_frame(w->allocator);
   log_enter;
@@ -253,45 +357,19 @@ void g_progress(g_core *w) {
   w->tick++;
   if (w->invalidate_fsm == 1) reassign_entity_fsm(w);
 
-  /* Place the archetype vector in the stack */
-  w->archetype_registry.flags = TO_STACK;
-  vec archetypes;
-  hash_to_archetype_to_vec(&w->archetype_registry, &archetypes);
-  w->archetype_registry.flags = TO_HEAP;
+  int64_t     arch_len = map_load(&w->archetype_registry);
+  thread_args args = {
+      .index = 0, .threads = stpush(arch_len * sizeof(pthread_t)), .w = w};
+  map_foreach(&w->archetype_registry, thread_archetype, &args);
 
-  /* Assign a thread to each archetype */
-  pthread_t *threads = stpush(archetypes.length * sizeof(pthread_t));
-
-  for (int64_t i = 0; i < archetypes.length; i++) {
-    kvpair     kv = read_kvpair(&w->archetype_registry, vec_at(&archetypes, i));
-    archetype *to_process = kv.value;
-    void     **args = stpush(2 * sizeof(void *));
-    args[0] = w;
-    args[1] = to_process;
-
-    /* Even if the composite is empty, we still will run the archetype to
-       simplify the join operation */
-    pthread_create(&threads[i], NULL, thread_process_archetype, args);
-  }
-
-  /* Wait for all threads to finish to start the post-serialization routines */
-  for (int64_t i = 0; i < archetypes.length; i++) {
-    if (pthread_join(threads[i], NULL)) {
-      log_debug("Thread unable to be joined");
-      exit(EXIT_FAILURE);
+  if (w->disable_concurrency == 0) {
+    for (int64_t i = 0; i < arch_len; i++) {
+      if (pthread_join(args.threads[i], NULL)) {
+        log_debug("Thread unable to be joined");
+        exit(EXIT_FAILURE);
+      }
     }
   }
-
-  /* The algorithm from the paper that does layed intersections for maximum
-     concurrency over intersecting types is not support and all other
-     systems run sequentially */
-  // for (int64_t i = 0; i < w->system_registry.length; i++) {
-  //   system_data *sys = system_vec_at(&w->system_registry, i);
-  //   /* Systems not assigned to an archetype are intersecting */
-  //   if (!sys->assigned) {
-  //     sys->start_system(&(g_query){.archetype_ctx = NULL, .world_ctx = w});
-  //   }
-  // }
 
   migration_routine(w);
   cleanup_routine(w);
@@ -310,10 +388,11 @@ void g_destroy_world(g_core *w) {
   hash_to_archetype_foreach(&w->archetype_registry, f_free_archetype, NULL);
   hash_to_archetype_free(&w->archetype_registry);
 
+  id_to_size_free(&w->component_registry);
+
   system_vec_foreach(&w->system_registry, f_free_system, NULL);
   system_vec_free(&w->system_registry);
 
-  id_to_size_free(&w->component_registry);
   id_to_hash_free(&w->entity_registry);
 
   stalloc_free(w->allocator);
@@ -354,7 +433,7 @@ static feach(is_registered, uint64_t, hash, {
          "Error: attempted to register a system with unregistered component "
          "types.");
 });
-void g_register_system(g_core *w, g_system sys, char *query) {
+void g_register_system(g_core *w, g_system sys, int32_t FLAGS, char *query) {
   log_enter;
   start_frame(w->allocator);
 
@@ -367,8 +446,9 @@ void g_register_system(g_core *w, g_system sys, char *query) {
   type_set_hinit(&types);
   hash_vec_foreach(&type_hashes, add_to_set, &types);
 
-  system_vec_push(&w->system_registry,
-                  &(system_data){.requirements = types, .start_system = sys});
+  system_vec_push(&w->system_registry, &(system_data){.requirements = types,
+                                                      .start_system = sys,
+                                                      .readonly = FLAGS});
 
   end_frame(w->allocator);
   log_leave;

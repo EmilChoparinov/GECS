@@ -49,17 +49,12 @@ g_pool g_get_pool(g_core *w, char *query) {
 
   archetype *arch = id_to_archetype_get(&w->archetype_registry, &arch_id).value;
 
-  vec out;
-  id_to_archetype_to_vec(&w->archetype_registry, &out);
-  for (int i = 0; i < out.length; i++) {
-    kvpair kv = read_kvpair(&w->archetype_registry, vec_at(&out, i));
-    log_debug("KEY: %ld", (gid *)kv.key);
-  }
-
   assert(arch && "Archetype does not exist!");
 
   pool.entities.component_offsets = &arch->offsets;
   pool.entities.stored_components = &arch->components;
+  pool.entities.arch = arch;
+  pool.entities.tick = w->tick;
   pool.idx = 0;
 
   end_frame(w->allocator);
@@ -76,6 +71,7 @@ g_par gq_vectorize(g_query *q) {
   itr.stored_components = &q->archetype_ctx->components;
   itr.arch = q->archetype_ctx;
   itr.tick = q->world_ctx->tick;
+  itr.world = q->world_ctx;
   return itr;
 }
 
@@ -119,12 +115,17 @@ void __gq_each(g_par vec, _each func, void *args) {
                                               .entities = vec,
                                               .args = args,
                                               .func = func};
-
-    pthread_create(&threads[thread_id], NULL, __gq_each_thread,
-                   &thread_args[thread_id]);
-    thread_id++;
+    if (vec.world->disable_concurrency == 1) {
+      __gq_each_thread(&thread_args[thread_id]);
+    } else {
+      pthread_create(&threads[thread_id], NULL, __gq_each_thread,
+                     &thread_args[thread_id]);
+      thread_id++;
+    }
     start_idx = stop_idx;
   }
+
+  if (vec.world->disable_concurrency == 1) return;
   for (int64_t i = 0; i < thread_id; i++) {
     pthread_join(threads[i], NULL);
   }

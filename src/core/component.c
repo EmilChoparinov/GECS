@@ -19,6 +19,12 @@ static g_core *select_component_location_ctx(g_query *q, gid entt, gid type) {
            "Component does not exist on this entity!");
   }
 
+  /* Entities that were created concurrently dont yet exist on this list,
+     so all components will be in this context even if they match the
+     archetype */
+  if (!id_to_hash_has(&q->world_ctx->entity_registry, &entt))
+    return q->archetype_ctx->simulation;
+
   return ctx;
 }
 
@@ -102,6 +108,20 @@ void _g_set_component(g_core *w, gid entt, gid type, void *comp_data) {
   log_leave;
 }
 
+bool _g_has_component(g_core *w, gid entt, gid type) {
+  log_enter;
+  gid *archetype_id = id_to_hash_get(&w->entity_registry, &entt).value;
+  if (!archetype_id) return false;
+
+  archetype *arch =
+      hash_to_archetype_get(&w->archetype_registry, archetype_id).value;
+  if (!arch) false;
+  log_leave;
+
+  /* Check if entities archetype has 'type' */
+  return hash_to_size_get(&arch->offsets, &type).value != NULL;
+}
+
 /*-------------------------------------------------------
  * Thread Unsafe Component Operations
  *-------------------------------------------------------*/
@@ -117,10 +137,8 @@ void g_add_component(g_core *w, gid entt, char *new_types) {
 
 void *g_get_component(g_core *w, gid entt_id, char *name) {
   log_enter;
-  start_frame(w->allocator);
   void *comp =
       _g_get_component(w, entt_id, (gid)hash_bytes(name, strlen(name)));
-  end_frame(w->allocator);
   log_leave;
   return comp;
 }
@@ -129,6 +147,12 @@ void g_set_component(g_core *w, gid entt, char *name, void *comp) {
   log_enter;
   _g_set_component(w, entt, (gid)hash_bytes(name, strlen(name)), comp);
   log_leave;
+}
+
+bool g_has_component(g_core *w, gid entt, char *name) {
+  log_enter;
+  log_leave;
+  return _g_has_component(w, entt, (gid)hash_bytes(name, strlen(name)));
 }
 
 void g_rem_component(g_core *w, gid entt, char *remove_types) {
@@ -170,8 +194,11 @@ void __gq_add(g_query *q, gid entt, char *name) {
   /* Regardless of where the component exists. This transition must be
      simulated because it is not possible to parallelize. */
   if (!q->archetype_ctx) return g_add_component(q->world_ctx, entt, name);
-  id_vec_push(&q->archetype_ctx->entt_mutation_buffer, &entt);
   return g_add_component(q->archetype_ctx->simulation, entt, name);
+}
+
+void __gq_mut(g_query *q, gid entt) {
+  id_vec_push(&q->archetype_ctx->entt_mutation_buffer, &entt);
 }
 
 void *__gq_get(g_query *q, gid entt, char *name) {
@@ -179,6 +206,12 @@ void *__gq_get(g_query *q, gid entt, char *name) {
   gid type_id = (gid)hash_bytes(name, strlen(name));
   return g_get_component(select_component_location_ctx(q, entt, type_id), entt,
                          name);
+}
+
+bool __gq_has(g_query *q, gid entt, char *name) {
+  if (!q->archetype_ctx) return g_has_component(q->world_ctx, entt, name);
+  return g_has_component(q->world_ctx, entt, name) ||
+         g_has_component(q->archetype_ctx->simulation, entt, name);
 }
 
 void __gq_set(g_query *q, gid entt, char *name, void *comp) {

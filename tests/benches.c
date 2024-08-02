@@ -28,18 +28,18 @@ struct CompB {
   int8_t _;
 };
 
-
 feach(unpack_entity, g_pool, entt, {
-    ((CompA*)gq_field(entt, CompA))->_ = 0;
-    ((CompB*)gq_field(entt, CompB))->_ = 0;
+  ((CompA *)gq_field(entt, CompA))->_ = 0;
+  ((CompB *)gq_field(entt, CompB))->_ = 0;
 });
 void unpack_comp(g_query *q) {
- g_par elements = gq_vectorize(q);
- gq_each(elements, unpack_entity, NULL);    
+  g_par elements = gq_vectorize(q);
+  gq_each(elements, unpack_entity, NULL);
 }
 
 void bench_read_N_entities_components() {
 
+  printf("Bench Read N Entities 2 Components\n");
   int entity_cnt[11] = {1, 4, 8, 16, 32, 64, 256, 1024, 4096, 16000, 0};
 
   int idx = 0;
@@ -59,10 +59,8 @@ void bench_read_N_entities_components() {
       G_ADD_COMPONENT(world, entt, CompB);
       g_mark_delete(world, entt);
     }
-   
-    bench_block({
-        g_progress(world);
-    });
+
+    bench_block({ g_progress(world); });
 
     g_destroy_world(world);
     idx++;
@@ -71,6 +69,7 @@ void bench_read_N_entities_components() {
 
 void bench_destroy_N_entities_with_2_components() {
 
+  printf("Bench Destroy N Entities 2 Components\n");
   int entity_cnt[11] = {1, 4, 8, 16, 32, 64, 256, 1024, 4096, 16000, 0};
 
   int idx = 0;
@@ -97,9 +96,10 @@ void bench_destroy_N_entities_with_2_components() {
 }
 
 void bench_create_N_entities_with_2_components() {
+  printf("Bench Create N Entities with 2 Components\n");
 
   int entity_cnt[15] = {1,    4,     8,     16,     32,      64,      256, 1024,
-                        4096, 16000, 65000, 262000, 1000000, 2000000, 0};
+                        4096, 16000, 0};
 
   int idx = 0;
   log_set_level(LOG_ERROR);
@@ -109,7 +109,6 @@ void bench_create_N_entities_with_2_components() {
     G_COMPONENT(world, CompA);
     G_COMPONENT(world, CompB);
 
-    printf("bench_create_N_entities_with_2_components: %d Entities\n", cnt);
     bench_block({
       for (int i = 0; i < cnt; i++) {
         gid entt = g_create_entity(world);
@@ -124,7 +123,9 @@ void bench_create_N_entities_with_2_components() {
 }
 
 int main(void) {
+  bench_read_N_entities_components();
   bench_destroy_N_entities_with_2_components();
+  bench_create_N_entities_with_2_components();
 
   return 0;
 }

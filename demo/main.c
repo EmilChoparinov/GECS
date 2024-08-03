@@ -15,6 +15,9 @@
 #define UI_WIN_X   GAME_WIN_X
 #define UI_WIN_Y   6 /* Display hit points, score, and rain stats */
 
+/* Define Simulation Amount */
+#define ENTITY_SPAWN_CHUNK 16
+
 /* VIP Entities */
 gid     PLAYER, SAMPLER;
 g_core *world;
@@ -105,7 +108,7 @@ void generate_new_rain(g_query *q) {
     on_generate->times_reset++;
     on_generate->last_update = now;
 
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < ENTITY_SPAWN_CHUNK; i++) {
       gid new_rain = gq_create_entity(q);
       gq_add(q, new_rain, Position);
 
@@ -261,7 +264,7 @@ void renderer() {
             state->wind_dir_x, state->wind_dir_y);
   mvwprintw(state->UI_WIN, 3, 0, "Rain Avg Cluster (X,Y): (%.3f, %.3f)\n",
             state->rain_avg_x, state->rain_avg_y);
-  mvwprintw(state->UI_WIN, 4, 0, "Recorded tickrate: %f / %ld ms \n",
+  mvwprintw(state->UI_WIN, 4, 0, "Recorded tickrate: %.3f / %ld ms \n",
             sampler->tick_rate, sampler->sample_window_ms);
 
   copywin(state->GAME_BUFFER, state->GAME_WIN, 0, 0, 0, 0, GAME_WIN_Y - 1,
@@ -331,6 +334,9 @@ void sample_performance(g_query *q) {
   rate_sampler->tick_rate = ((double)tick_end - rate_sampler->tick_start) /
                             rate_sampler->sample_window_ms;
   rate_sampler->tick_start = tick_end;
+  FILE *file = fopen("tickrates.txt", "a");
+  fprintf(file, ", %.3f", rate_sampler->tick_rate);
+  fclose(file);
 }
 
 int main(void) {
@@ -383,7 +389,7 @@ int main(void) {
   G_ADD_COMPONENT(world, PLAYER, PlayerData);
   G_SET_COMPONENT(world, PLAYER, Position,
                   {.x = GAME_WIN_X / 2, .y = GAME_WIN_Y - 2});
-  G_SET_COMPONENT(world, PLAYER, PlayerData, {.score = 0, .hits_left = 3});
+  G_SET_COMPONENT(world, PLAYER, PlayerData, {.score = 0, .hits_left = 100});
 
   gid rainSpawner = g_create_entity(world);
   G_ADD_COMPONENT(world, rainSpawner, RainSpawner);
@@ -394,7 +400,7 @@ int main(void) {
   clock_gettime(CLOCK_MONOTONIC, &t->last_update);
 
   /* Setup falling rain entities */
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < ENTITY_SPAWN_CHUNK; i++) {
     gid rain = g_create_entity(world);
     // printf("rain id: %lu\n", rain);
     G_ADD_COMPONENT(world, rain, Position);
@@ -432,14 +438,15 @@ int main(void) {
   G_SYSTEM(world, sample_performance, DEFAULT, TickRateSampler);
 
   while (state->isGameRunning) {
-    renderer(); /* ncurses hates threading! so i can't use the ECS for this */
+    renderer(); /* ncurses hates threading! so i can't use the ECS for this
+    // */
     g_progress(world);
     // usleep(1000);
   }
 
   /* CLEANUP PHASE */
   /* There's a mem corruption bug with system handling somewhere */
-  // g_destroy_world(world);
+  g_destroy_world(world);
   endwin();
   PlayerData *data = G_GET_COMPONENT(world, PLAYER, PlayerData);
   printf("Game over! You dodged %d rain drops\n", data->score);

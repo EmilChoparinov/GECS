@@ -6,6 +6,8 @@ libgecs.a
 libgecs.zip
 extra/**
 dist/**
+tickrates.txt
+
 ### C ###
 # Prerequisites
 *.d

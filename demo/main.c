@@ -10,10 +10,11 @@
 #include <unistd.h>
 
 /* Define Window Sizes */
-#define GAME_WIN_X 40
-#define GAME_WIN_Y 20
-#define UI_WIN_X   GAME_WIN_X
-#define UI_WIN_Y   6 /* Display hit points, score, and rain stats */
+#define GAME_WIN_X     40
+#define GAME_WIN_Y     20
+#define UI_WIN_X       GAME_WIN_X
+#define UI_WIN_Y       6 /* Display hit points, score, and rain stats */
+#define DISABLE_RENDER 0
 
 /* Define Simulation Amount */
 #define ENTITY_SPAWN_CHUNK 16
@@ -335,7 +336,7 @@ void sample_performance(g_query *q) {
                             rate_sampler->sample_window_ms;
   rate_sampler->tick_start = tick_end;
   FILE *file = fopen("tickrates.txt", "a");
-  fprintf(file, ", %.3f", rate_sampler->tick_rate);
+  fprintf(file, ", %f", rate_sampler->tick_rate);
   fclose(file);
 }
 
@@ -343,16 +344,18 @@ int main(void) {
   srand(time(NULL));
   log_set_level(LOG_ERROR);
 
-  /* Curses Init */
-  initscr();
-  keypad(stdscr, TRUE);
-  nodelay(stdscr, TRUE); /* Make input reads non-blocking */
-  noecho();
+  if (!DISABLE_RENDER) {
+    /* Curses Init */
+    initscr();
+    keypad(stdscr, TRUE);
+    nodelay(stdscr, TRUE); /* Make input reads non-blocking */
+    noecho();
+  }
 
   /* SETUP PHASE */
   world = g_create_world();
   world->disable_concurrency =
-      0; /* Enable/Disable for benchmark data collection. */
+      1; /* Enable/Disable for benchmark data collection. */
 
   /* Register components */
   G_COMPONENT(world, GameState);
@@ -389,7 +392,7 @@ int main(void) {
   G_ADD_COMPONENT(world, PLAYER, PlayerData);
   G_SET_COMPONENT(world, PLAYER, Position,
                   {.x = GAME_WIN_X / 2, .y = GAME_WIN_Y - 2});
-  G_SET_COMPONENT(world, PLAYER, PlayerData, {.score = 0, .hits_left = 100});
+  G_SET_COMPONENT(world, PLAYER, PlayerData, {.score = 0, .hits_left = 100000});
 
   gid rainSpawner = g_create_entity(world);
   G_ADD_COMPONENT(world, rainSpawner, RainSpawner);
@@ -438,16 +441,15 @@ int main(void) {
   G_SYSTEM(world, sample_performance, DEFAULT, TickRateSampler);
 
   while (state->isGameRunning) {
-    renderer(); /* ncurses hates threading! so i can't use the ECS for this
-    // */
+    /*  ncurses hates threading! so i can't use the ECS for this */
+    if (!DISABLE_RENDER) renderer();
     g_progress(world);
-    // usleep(1000);
   }
 
   /* CLEANUP PHASE */
   /* There's a mem corruption bug with system handling somewhere */
   g_destroy_world(world);
-  endwin();
+  if (!DISABLE_RENDER) endwin();
   PlayerData *data = G_GET_COMPONENT(world, PLAYER, PlayerData);
   printf("Game over! You dodged %d rain drops\n", data->score);
   return 0;

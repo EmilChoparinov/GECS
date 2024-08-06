@@ -91,6 +91,7 @@ struct archetype {
   type_set types; /* Set : [hash(comp name)] */
 
   g_core *simulation; /* Entity transition simulations are done here. */
+  g_core *belongs_to; /* Entity transition out simulations are done here. */
 
   /* These three members are used for indexing and component retrieval. */
   composite    components; /* Contiguous vector of interleaved components. */
@@ -117,6 +118,11 @@ struct archetype {
   /* dead_fragment_buffer is filled when a system transitions an entity off
      this archetype. These fragments are collected and cleaned per tick. */
   int64_vec dead_fragment_buffer; /* Vec : index_of(composite) */
+
+  /* Concurrency properties */
+  pthread_t thread_id;
+  atomic_bool thread_in_process;
+  atomic_bool thread_complete;
 };
 
 struct g_par {

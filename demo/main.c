@@ -10,14 +10,15 @@
 #include <unistd.h>
 
 /* Define Window Sizes */
-#define GAME_WIN_X     40
-#define GAME_WIN_Y     20
-#define UI_WIN_X       GAME_WIN_X
-#define UI_WIN_Y       6 /* Display hit points, score, and rain stats */
-#define DISABLE_RENDER 0
+#define GAME_WIN_X 40
+#define GAME_WIN_Y 20
+#define UI_WIN_X   GAME_WIN_X
+#define UI_WIN_Y   6 /* Display hit points, score, and rain stats */
 
-/* Define Simulation Amount */
-#define ENTITY_SPAWN_CHUNK 16
+/* Simulation Variables */
+#define DISABLE_RENDER      1
+#define DISABLE_CONCURRENCY 1
+#define ENTITY_SPAWN_CHUNK  1024
 
 /* VIP Entities */
 gid     PLAYER, SAMPLER;
@@ -355,7 +356,7 @@ int main(void) {
   /* SETUP PHASE */
   world = g_create_world();
   world->disable_concurrency =
-      1; /* Enable/Disable for benchmark data collection. */
+      DISABLE_CONCURRENCY; /* Enable/Disable for benchmark data collection. */
 
   /* Register components */
   G_COMPONENT(world, GameState);

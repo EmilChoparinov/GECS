@@ -5,6 +5,82 @@
 
 archetype empty_archetype = {0};
 
+void *boot_system(void *arg) {
+  void       **args = (void **)arg;
+  system_data *sys = args[0];
+  g_query     *query = args[1];
+  sys->start_system(query);
+  return NULL;
+}
+
+void archetype_perform_process(g_core *w, archetype *process_arch) {
+  start_frame(process_arch->allocator);
+
+  system_vec readonlys;
+  system_vec_sinit(&readonlys, process_arch->contenders.length);
+
+  for (int64_t i = 0; i < process_arch->contenders.length; i++) {
+    system_data *sys = system_vec_at(&process_arch->contenders, i);
+    if (sys->readonly != 0) {
+      system_vec_push(&readonlys, sys);
+      continue;
+    }
+    sys->start_system(
+        &(g_query){.world_ctx = w, .archetype_ctx = process_arch});
+  }
+
+  if (readonlys.length == 0) return;
+
+  pthread_t *threads = stpush(readonlys.length * sizeof(pthread_t));
+
+  for (int64_t i = 0; i < readonlys.length; i++) {
+    system_data *sys = system_vec_at(&readonlys, i);
+    g_query      q = {.world_ctx = w, .archetype_ctx = process_arch};
+    if (w->disable_concurrency == 1) {
+      sys->start_system(&q);
+    } else {
+      void **args = stpush(2 * sizeof(void *));
+      args[0] = sys;
+      args[1] = &q;
+      pthread_create(&threads[i], NULL, boot_system, args);
+    }
+  }
+
+  if (w->disable_concurrency == 0) {
+    for (int64_t i = 0; i < readonlys.length; i++) {
+      if (pthread_join(threads[i], NULL)) {
+        log_debug("Thread unable to be joined");
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+
+  end_frame(process_arch->allocator);
+}
+
+static void *thread_entry(void *args) {
+  archetype *arch = args;
+
+  atomic_init(&arch->thread_in_process, false);
+  atomic_init(&arch->thread_complete, false);
+
+  while (true) {
+    bool to_process = atomic_load(&arch->thread_in_process);
+    if (to_process) {
+      atomic_store(&arch->thread_in_process, false);
+
+      archetype_perform_process(arch->belongs_to, arch);
+      atomic_store(&arch->thread_complete, true);
+    }
+
+    /* We check if parent thread wants us to close, and close */
+    pthread_testcancel();
+  }
+}
+
+void subthread_archetype(archetype *a) {
+  pthread_create(&a->thread_id, NULL, thread_entry, a);
+}
 feach(add_new_offset, kvpair, type, {
   void     **list = (void **)args;
   archetype *a = list[0];
@@ -62,6 +138,7 @@ void init_archetype(g_core *w, archetype *a, hash_vec *key) {
 
   /* Setup the archetypes simulation for non-concurrent properties */
   a->simulation = g_create_world();
+  a->belongs_to = w;
   gid_atomic_set(&a->simulation->id_gen, CACHED);
 
   /* Inside the simulation context, a transition can be triggered where there
@@ -99,6 +176,16 @@ void free_archetype(archetype *a) {
   int64_vec_free(&a->dead_fragment_buffer);
 
   if (a->simulation) g_destroy_world(a->simulation);
+
+  if (!a->belongs_to->disable_concurrency) {
+    /* Request the thread to cancel, this should be guarentee'd */
+    pthread_cancel(a->thread_id);
+    if (pthread_join(a->thread_id, NULL)) {
+      log_debug("Thread unable to be joined/closed");
+      exit(EXIT_FAILURE);
+    }
+  }
+
   log_leave;
 };
 
@@ -196,6 +283,9 @@ void delta_transition(g_core *w, gid entt, hash_vec *to_key) {
   archetype *a_next, *a_prev;
   kvpair     kv;
 
+  /* Load the current state of the archetype on the FSM */
+  a_prev = load_entity_archetype(w, entt);
+
   /* We generate the archetype id by hashing the key. Since the vector is known
      to be ordered, the hashes will be the same.  */
   uint64_t arch_id = hash_vector(to_key);
@@ -209,16 +299,17 @@ void delta_transition(g_core *w, gid entt, hash_vec *to_key) {
     /* Add the world, a new archetype appearing causes the FSM process to
        retrigger. */
     hash_to_archetype_put(&w->archetype_registry, &arch_id, &a);
+    a_next = hash_to_archetype_get(&w->archetype_registry, &arch_id).value;
+    if (!w->disable_concurrency) subthread_archetype(a_next);
     w->invalidate_fsm = 1;
+  } else {
+    /* Load the archetype to transition to */
+    a_next = hash_to_archetype_get(&w->archetype_registry, &arch_id).value;
   }
 
   /* Load the archetype of the current entity */
   kv = id_to_hash_get(&w->entity_registry, &entt);
   assert(kv.value && "Invalid Entity ID!");
-
-  /* Load the archetype to transition to */
-  a_next = hash_to_archetype_get(&w->archetype_registry, &arch_id).value;
-  a_prev = load_entity_archetype(w, entt);
 
   /* Case 1: a_prev is the empty archetype. We don't need to do anything other
              than move the entity to a_next. No copying is necessary. */

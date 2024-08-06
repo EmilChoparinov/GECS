@@ -33,4 +33,11 @@ void archetype_key(char *types, hash_vec *key);
    'types' */
 void delta_transition(g_core *w, gid entt, hash_vec *to_key);
 
+/* Creates a new thread and spins up this archetype. Use only once */
+void subthread_archetype(archetype *a);
+
+/* Performs the thread process on the current thread instead of being managed
+   on a different one */
+void archetype_perform_process(g_core *w, archetype *process_arch);
+
 #endif

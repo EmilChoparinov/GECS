@@ -250,105 +250,34 @@ g_core *g_create_world(void) {
   return w;
 }
 
-void *boot_system(void *arg) {
-  void       **args = (void **)arg;
-  system_data *sys = args[0];
-  g_query     *query = args[1];
-  sys->start_system(query);
-  return NULL;
-}
+feach(progress_archetype, kvpair, item, {
+  archetype *a = item.value;
 
-void process_archetype(g_core *w, archetype *process_arch) {
-  start_frame(process_arch->allocator);
+  /* Use this thread to process the archetype. So fast return */
+  if (a->belongs_to->disable_concurrency)
+    return archetype_perform_process(a->belongs_to, a);
 
-  system_vec readonlys;
-  system_vec_sinit(&readonlys, process_arch->contenders.length);
+  /* Tracker used outside the thread of the process finished. Set this
+     first to avoid race conditions */
+  atomic_store(&a->thread_complete, false);
 
-  for (int64_t i = 0; i < process_arch->contenders.length; i++) {
-    system_data *sys = system_vec_at(&process_arch->contenders, i);
-    if (sys->readonly != 0) {
-      system_vec_push(&readonlys, sys);
-      continue;
-    }
-    sys->start_system(
-        &(g_query){.world_ctx = w, .archetype_ctx = process_arch});
+  /* Set this to true and the thread will enter the process once. At the end
+     this sets thread_complete to true. */
+  atomic_store(&a->thread_in_process, true);
+});
+feach(sync_archetypes, kvpair, item, {
+  archetype *a = item.value;
+  /* No need to wait for anything */
+  if (a->belongs_to->disable_concurrency) {
+    return;
   }
 
-  if (readonlys.length == 0) return;
-
-  pthread_t *threads = stpush(readonlys.length * sizeof(pthread_t));
-
-  for (int64_t i = 0; i < readonlys.length; i++) {
-    system_data *sys = system_vec_at(&readonlys, i);
-    g_query      q = {.world_ctx = w, .archetype_ctx = process_arch};
-    if (w->disable_concurrency == 1) {
-      sys->start_system(&q);
-    } else {
-      void **args = stpush(2 * sizeof(void *));
-      args[0] = sys;
-      args[1] = &q;
-      pthread_create(&threads[i], NULL, boot_system, args);
-    }
+  /* Wait for each archetype to finish */
+  while (true) {
+    bool is_complete = atomic_load(&a->thread_complete);
+    if (is_complete) return;
   }
-
-  if (w->disable_concurrency == 0) {
-    for (int64_t i = 0; i < readonlys.length; i++) {
-      if (pthread_join(threads[i], NULL)) {
-        log_debug("Thread unable to be joined");
-        exit(EXIT_FAILURE);
-      }
-    }
-  }
-
-  end_frame(process_arch->allocator);
-}
-void *thread_process_archetype(void *arg) {
-  log_enter;
-  void **args = (void **)arg;
-  process_archetype(args[0], args[1]);
-  log_leave;
-  return NULL;
-}
-
-typedef struct thread_args {
-  int64_t    index;
-  pthread_t *threads;
-  g_core    *w;
-} thread_args;
-void thread_archetype(void *_el, void *args) {
-  kvpair item = *(kvpair *)_el;
-  {
-    thread_args *targs = (thread_args *)args;
-    void       **process_args = __stpushframe(2 * sizeof(void *));
-    process_args[0] = targs->w;
-    process_args[1] = item.value;
-    if (targs->w->disable_concurrency == 1) {
-      process_archetype(targs->w, item.value);
-      return;
-    }
-    pthread_create(&targs->threads[targs->index], ((void *)0),
-                   thread_process_archetype, process_args);
-    targs->index++;
-  }
-}
-
-// feach(thread_archetype, kvpair, item, {
-//   thread_args *targs = (thread_args *)args;
-
-//   void **process_args = stpush(2 * sizeof(void *));
-//   process_args[0] = targs->w;
-//   process_args[1] = item.value;
-
-//   if (targs->w->disable_concurrency == 1) {
-//     process_archetype(targs->w, item.value);
-//     return;
-//   }
-
-//   pthread_create(&targs->threads[targs->index], NULL,
-//   thread_process_archetype,
-//                  process_args);
-//   targs->index++;
-// });
+});
 void g_progress(g_core *w) {
   start_frame(w->allocator);
   log_enter;
@@ -357,19 +286,12 @@ void g_progress(g_core *w) {
   w->tick++;
   if (w->invalidate_fsm == 1) reassign_entity_fsm(w);
 
-  int64_t     arch_len = map_load(&w->archetype_registry);
-  thread_args args = {
-      .index = 0, .threads = stpush(arch_len * sizeof(pthread_t)), .w = w};
-  map_foreach(&w->archetype_registry, thread_archetype, &args);
+  /* Spin up or run the archetype */
+  map_foreach(&w->archetype_registry, progress_archetype, NULL);
 
-  if (w->disable_concurrency == 0) {
-    for (int64_t i = 0; i < arch_len; i++) {
-      if (pthread_join(args.threads[i], NULL)) {
-        log_debug("Thread unable to be joined");
-        exit(EXIT_FAILURE);
-      }
-    }
-  }
+  /* Wait for each thread to finish its process and synchronize. This is
+     equivalent to performing a join */
+  map_foreach(&w->archetype_registry, sync_archetypes, NULL);
 
   migration_routine(w);
   cleanup_routine(w);
